@@ -14,6 +14,9 @@ interface ProjectDao {
     @Insert
     suspend fun insert(project: Project): Long
 
+    @Update
+    suspend fun update(project: Project)
+
     @Delete
     suspend fun delete(project: Project)
 }

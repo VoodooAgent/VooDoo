@@ -29,5 +29,6 @@ data class Task(
     val id: Long = 0,
     val projectId: Long,
     val title: String,
+    val description: String = "",
     val isDone: Boolean = false
 )
