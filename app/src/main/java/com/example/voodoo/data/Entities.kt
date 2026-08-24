@@ -9,7 +9,9 @@ import androidx.room.PrimaryKey
 data class Project(
     @PrimaryKey(autoGenerate = true)
     val id: Long = 0,
-    val name: String
+    val name: String,
+    val sortOrder: Int = 0,
+    val createdAt: Long = System.currentTimeMillis()
 )
 
 @Entity(
@@ -30,5 +32,7 @@ data class Task(
     val projectId: Long,
     val title: String,
     val description: String = "",
-    val isDone: Boolean = false
+    val isDone: Boolean = false,
+    val sortOrder: Int = 0,
+    val createdAt: Long = System.currentTimeMillis()
 )
