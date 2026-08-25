@@ -4,6 +4,24 @@ import androidx.room.*
 import kotlinx.coroutines.flow.Flow
 
 @Dao
+interface ProjectContextDao {
+    @Query("SELECT * FROM contexts ORDER BY createdAt ASC")
+    fun getAllContexts(): Flow<List<ProjectContext>>
+
+    @Query("SELECT * FROM contexts WHERE id = :contextId")
+    fun getContextById(contextId: Long): Flow<ProjectContext?>
+
+    @Insert
+    suspend fun insert(context: ProjectContext): Long
+
+    @Update
+    suspend fun update(context: ProjectContext)
+
+    @Delete
+    suspend fun delete(context: ProjectContext)
+}
+
+@Dao
 interface ProjectDao {
     @Query("SELECT * FROM projects ORDER BY sortOrder ASC, id ASC")
     fun getAllProjectsByManual(): Flow<List<Project>>
@@ -13,6 +31,24 @@ interface ProjectDao {
 
     @Query("SELECT * FROM projects ORDER BY createdAt DESC, id DESC")
     fun getAllProjectsByDate(): Flow<List<Project>>
+
+    @Query("SELECT * FROM projects WHERE contextId = :contextId ORDER BY sortOrder ASC, id ASC")
+    fun getProjectsByContextByManual(contextId: Long): Flow<List<Project>>
+
+    @Query("SELECT * FROM projects WHERE contextId = :contextId ORDER BY name ASC, id ASC")
+    fun getProjectsByContextByName(contextId: Long): Flow<List<Project>>
+
+    @Query("SELECT * FROM projects WHERE contextId = :contextId ORDER BY createdAt DESC, id DESC")
+    fun getProjectsByContextByDate(contextId: Long): Flow<List<Project>>
+
+    @Query("SELECT * FROM projects WHERE contextId IS NULL ORDER BY sortOrder ASC, id ASC")
+    fun getProjectsWithoutContextByManual(): Flow<List<Project>>
+
+    @Query("SELECT * FROM projects WHERE contextId IS NULL ORDER BY name ASC, id ASC")
+    fun getProjectsWithoutContextByName(): Flow<List<Project>>
+
+    @Query("SELECT * FROM projects WHERE contextId IS NULL ORDER BY createdAt DESC, id DESC")
+    fun getProjectsWithoutContextByDate(): Flow<List<Project>>
 
     @Query("SELECT * FROM projects WHERE id = :projectId")
     fun getProjectById(projectId: Long): Flow<Project?>
