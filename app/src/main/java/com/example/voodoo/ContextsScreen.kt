@@ -1,6 +1,7 @@
 package com.example.voodoo
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -17,6 +18,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material3.AlertDialog
@@ -179,8 +181,7 @@ fun ContextItemEdit(
 @Composable
 fun AddContextDialog(onDismiss: () -> Unit, onConfirm: (String, Long) -> Unit) {
     var name by remember { mutableStateOf("") }
-    var selectedColor by remember { mutableStateOf(0xFFE0E0E0L) }
-
+    var selectedColor by remember { mutableStateOf(0xFFEF5350L) }
     val colors = listOf(
         0xFFEF5350L, 0xFFEC407AL, 0xFFAB47BCL, 0xFF7E57C2L, 0xFF5C6BC0L,
         0xFF42A5F5L, 0xFF29B6F6L, 0xFF26C6DAL, 0xFF26A69AL, 0xFF66BB6AL,
@@ -211,7 +212,18 @@ fun AddContextDialog(onDismiss: () -> Unit, onConfirm: (String, Long) -> Unit) {
                             modifier = Modifier
                                 .size(40.dp)
                                 .background(Color(color), MaterialTheme.shapes.small)
-                        )
+                                .clickable { selectedColor = color }
+                                .padding(2.dp)
+                        ) {
+                            if (selectedColor == color) {
+                                Icon(
+                                    Icons.Default.Check,
+                                    contentDescription = "Выбран",
+                                    tint = Color.White,
+                                    modifier = Modifier.align(Alignment.Center)
+                                )
+                            }
+                        }
                     }
                 }
             }
@@ -236,7 +248,6 @@ fun EditContextDialog(
 ) {
     var name by remember { mutableStateOf(context.name) }
     var selectedColor by remember { mutableStateOf(context.color) }
-
     val colors = listOf(
         0xFFEF5350L, 0xFFEC407AL, 0xFFAB47BCL, 0xFF7E57C2L, 0xFF5C6BC0L,
         0xFF42A5F5L, 0xFF29B6F6L, 0xFF26C6DAL, 0xFF26A69AL, 0xFF66BB6AL,
@@ -267,7 +278,18 @@ fun EditContextDialog(
                             modifier = Modifier
                                 .size(40.dp)
                                 .background(Color(color), MaterialTheme.shapes.small)
-                        )
+                                .clickable { selectedColor = color }
+                                .padding(2.dp)
+                        ) {
+                            if (selectedColor == color) {
+                                Icon(
+                                    Icons.Default.Check,
+                                    contentDescription = "Выбран",
+                                    tint = Color.White,
+                                    modifier = Modifier.align(Alignment.Center)
+                                )
+                            }
+                        }
                     }
                 }
             }

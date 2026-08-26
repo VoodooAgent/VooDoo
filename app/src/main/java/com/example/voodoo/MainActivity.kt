@@ -211,6 +211,7 @@ fun ContextProjectsScreen(
 ) {
     var projects by remember { mutableStateOf<List<Project>>(emptyList()) }
     var context by remember { mutableStateOf<ProjectContext?>(null) }
+    var allContexts by remember { mutableStateOf<List<ProjectContext>>(emptyList()) }
     var showAddDialog by remember { mutableStateOf(false) }
     var editingProject by remember { mutableStateOf<Project?>(null) }
     var sortOrder by remember { mutableStateOf(SortOrder.MANUAL) }
@@ -218,6 +219,7 @@ fun ContextProjectsScreen(
     val scope = rememberCoroutineScope()
 
     LaunchedEffect(contextId) { app.database.projectContextDao().getContextById(contextId).collectLatest { context = it } }
+    LaunchedEffect(Unit) { app.database.projectContextDao().getAllContexts().collectLatest { allContexts = it } }
     LaunchedEffect(sortOrder, contextId) {
         val flow = when (sortOrder) {
             SortOrder.MANUAL -> app.database.projectDao().getProjectsByContextByManual(contextId)
@@ -273,12 +275,30 @@ fun ContextProjectsScreen(
     }
 
     if (showAddDialog) {
-        AddProjectDialog({ showAddDialog = false }, { name ->
-            showAddDialog = false; scope.launch { app.database.projectDao().insert(Project(name = name, contextId = contextId, sortOrder = (projects.maxOfOrNull { it.sortOrder } ?: 0) + 1)) }
-        })
+        AddProjectDialog(
+            contexts = allContexts,
+            currentContextId = contextId,
+            onDismiss = { showAddDialog = false },
+            onConfirm = { name, selectedContextId ->
+                showAddDialog = false
+                scope.launch {
+                    app.database.projectDao().insert(
+                        Project(name = name, contextId = selectedContextId, sortOrder = (projects.maxOfOrNull { it.sortOrder } ?: 0) + 1)
+                    )
+                }
+            }
+        )
     }
     editingProject?.let { p ->
-        EditProjectDialog(p, { editingProject = null }, { n -> scope.launch { app.database.projectDao().update(p.copy(name = n)) }; editingProject = null })
+        EditProjectDialog(
+            project = p,
+            contexts = allContexts,
+            onDismiss = { editingProject = null },
+            onConfirm = { name, selectedContextId ->
+                scope.launch { app.database.projectDao().update(p.copy(name = name, contextId = selectedContextId)) }
+                editingProject = null
+            }
+        )
     }
 }
 
@@ -304,12 +324,14 @@ fun SortMenu(currentSort: SortOrder, onSortChange: (SortOrder) -> Unit, showReor
 @Composable
 fun ProjectListScreen(app: VooDooApp, contextId: Long?, onProjectClick: (Long) -> Unit, onBackClick: () -> Unit, onSettingsClick: () -> Unit) {
     var projects by remember { mutableStateOf<List<Project>>(emptyList()) }
+    var allContexts by remember { mutableStateOf<List<ProjectContext>>(emptyList()) }
     var showAddDialog by remember { mutableStateOf(false) }
     var editingProject by remember { mutableStateOf<Project?>(null) }
     var sortOrder by remember { mutableStateOf(SortOrder.MANUAL) }
     var manualReorderMode by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
 
+    LaunchedEffect(Unit) { app.database.projectContextDao().getAllContexts().collectLatest { allContexts = it } }
     LaunchedEffect(sortOrder, contextId) {
         val flow = if (contextId == null) {
             when (sortOrder) {
@@ -363,12 +385,30 @@ fun ProjectListScreen(app: VooDooApp, contextId: Long?, onProjectClick: (Long) -
     }
 
     if (showAddDialog) {
-        AddProjectDialog({ showAddDialog = false }, { name ->
-            showAddDialog = false; scope.launch { app.database.projectDao().insert(Project(name = name, contextId = contextId, sortOrder = (projects.maxOfOrNull { it.sortOrder } ?: 0) + 1)) }
-        })
+        AddProjectDialog(
+            contexts = allContexts,
+            currentContextId = contextId,
+            onDismiss = { showAddDialog = false },
+            onConfirm = { name, selectedContextId ->
+                showAddDialog = false
+                scope.launch {
+                    app.database.projectDao().insert(
+                        Project(name = name, contextId = selectedContextId, sortOrder = (projects.maxOfOrNull { it.sortOrder } ?: 0) + 1)
+                    )
+                }
+            }
+        )
     }
     editingProject?.let { p ->
-        EditProjectDialog(p, { editingProject = null }, { n -> scope.launch { app.database.projectDao().update(p.copy(name = n)) }; editingProject = null })
+        EditProjectDialog(
+            project = p,
+            contexts = allContexts,
+            onDismiss = { editingProject = null },
+            onConfirm = { name, selectedContextId ->
+                scope.launch { app.database.projectDao().update(p.copy(name = name, contextId = selectedContextId)) }
+                editingProject = null
+            }
+        )
     }
 }
 
@@ -496,12 +536,145 @@ fun TaskItem(
 }
 
 @Composable
-fun AddProjectDialog(onDismiss: () -> Unit, onConfirm: (String) -> Unit) {
+fun AddProjectDialog(
+    contexts: List<ProjectContext>,
+    currentContextId: Long?,
+    onDismiss: () -> Unit,
+    onConfirm: (String, Long?) -> Unit
+) {
     var text by remember { mutableStateOf("") }
+    var selectedContextId by remember { mutableStateOf(currentContextId) }
+
     AlertDialog(
-        onDismissRequest = onDismiss, title = { Text("Новый проект") },
-        text = { OutlinedTextField(text, { text = it }, label = { Text("Название проекта") }, singleLine = true) },
-        confirmButton = { TextButton({ onConfirm(text.trim()) }, enabled = text.isNotBlank()) { Text("Добавить") } },
+        onDismissRequest = onDismiss,
+        title = { Text("Новый проект") },
+        text = {
+            Column {
+                OutlinedTextField(
+                    value = text,
+                    onValueChange = { text = it },
+                    label = { Text("Название проекта") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Spacer(modifier = Modifier.height(16.dp))
+                Text("Контекст:", style = MaterialTheme.typography.bodyMedium)
+                Spacer(modifier = Modifier.height(8.dp))
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    onClick = { selectedContextId = null }
+                ) {
+                    Row(
+                        modifier = Modifier.padding(12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        if (selectedContextId == null) {
+                            Icon(Icons.Default.Check, "Выбран", modifier = Modifier.size(18.dp))
+                            Spacer(modifier = Modifier.width(8.dp))
+                        }
+                        Text("Без контекста")
+                    }
+                }
+                Spacer(modifier = Modifier.height(4.dp))
+                contexts.forEach { context ->
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        onClick = { selectedContextId = context.id },
+                        colors = CardDefaults.cardColors(containerColor = Color(context.color).copy(alpha = 0.3f))
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(12.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            if (selectedContextId == context.id) {
+                                Icon(Icons.Default.Check, "Выбран", modifier = Modifier.size(18.dp))
+                                Spacer(modifier = Modifier.width(8.dp))
+                            }
+                            Text(context.name)
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(4.dp))
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = { onConfirm(text.trim(), selectedContextId) },
+                enabled = text.isNotBlank()
+            ) { Text("Добавить") }
+        },
+        dismissButton = { TextButton(onDismiss) { Text("Отмена") } }
+    )
+}
+
+@Composable
+fun EditProjectDialog(
+    project: Project,
+    contexts: List<ProjectContext>,
+    onDismiss: () -> Unit,
+    onConfirm: (String, Long?) -> Unit
+) {
+    var text by remember { mutableStateOf(project.name) }
+    var selectedContextId by remember { mutableStateOf(project.contextId) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Редактировать проект") },
+        text = {
+            Column {
+                OutlinedTextField(
+                    value = text,
+                    onValueChange = { text = it },
+                    label = { Text("Название проекта") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Spacer(modifier = Modifier.height(16.dp))
+                Text("Контекст:", style = MaterialTheme.typography.bodyMedium)
+                Spacer(modifier = Modifier.height(8.dp))
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    onClick = { selectedContextId = null }
+                ) {
+                    Row(
+                        modifier = Modifier.padding(12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        if (selectedContextId == null) {
+                            Icon(Icons.Default.Check, "Выбран", modifier = Modifier.size(18.dp))
+                            Spacer(modifier = Modifier.width(8.dp))
+                        }
+                        Text("Без контекста")
+                    }
+                }
+                Spacer(modifier = Modifier.height(4.dp))
+                contexts.forEach { context ->
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        onClick = { selectedContextId = context.id },
+                        colors = CardDefaults.cardColors(containerColor = Color(context.color).copy(alpha = 0.3f))
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(12.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            if (selectedContextId == context.id) {
+                                Icon(Icons.Default.Check, "Выбран", modifier = Modifier.size(18.dp))
+                                Spacer(modifier = Modifier.width(8.dp))
+                            }
+                            Text(context.name)
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(4.dp))
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = { onConfirm(text.trim(), selectedContextId) },
+                enabled = text.isNotBlank()
+            ) { Text("Сохранить") }
+        },
         dismissButton = { TextButton(onDismiss) { Text("Отмена") } }
     )
 }
@@ -520,17 +693,6 @@ fun AddTaskDialog(onDismiss: () -> Unit, onConfirm: (String, String) -> Unit) {
             }
         },
         confirmButton = { TextButton({ onConfirm(title.trim(), description.trim()) }, enabled = title.isNotBlank()) { Text("Добавить") } },
-        dismissButton = { TextButton(onDismiss) { Text("Отмена") } }
-    )
-}
-
-@Composable
-fun EditProjectDialog(project: Project, onDismiss: () -> Unit, onConfirm: (String) -> Unit) {
-    var text by remember { mutableStateOf(project.name) }
-    AlertDialog(
-        onDismissRequest = onDismiss, title = { Text("Редактировать проект") },
-        text = { OutlinedTextField(text, { text = it }, label = { Text("Название проекта") }, singleLine = true, modifier = Modifier.fillMaxWidth()) },
-        confirmButton = { TextButton({ onConfirm(text.trim()) }, enabled = text.isNotBlank()) { Text("Сохранить") } },
         dismissButton = { TextButton(onDismiss) { Text("Отмена") } }
     )
 }
