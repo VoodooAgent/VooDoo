@@ -8,6 +8,9 @@ interface ProjectContextDao {
     @Query("SELECT * FROM contexts ORDER BY sortOrder ASC, id ASC")
     fun getAllContexts(): Flow<List<ProjectContext>>
 
+    @Query("SELECT * FROM contexts ORDER BY sortOrder ASC, id ASC")
+    suspend fun getAllContextsSync(): List<ProjectContext>
+
     @Query("SELECT * FROM contexts WHERE id = :contextId")
     fun getContextById(contextId: Long): Flow<ProjectContext?>
 
@@ -28,6 +31,9 @@ interface ProjectContextDao {
 interface TaskDao {
     @Query("SELECT * FROM tasks ORDER BY sortOrder ASC, id ASC")
     fun getAllTasks(): Flow<List<Task>>
+
+    @Query("SELECT * FROM tasks ORDER BY sortOrder ASC, id ASC")
+    suspend fun getAllTasksSync(): List<Task>
 
     @Query("SELECT * FROM tasks WHERE contextId = :contextId ORDER BY sortOrder ASC, id ASC")
     fun getTasksByContext(contextId: Long): Flow<List<Task>>
@@ -94,6 +100,9 @@ interface TimerSessionDao {
 
     @Query("SELECT * FROM timer_sessions WHERE taskId = :taskId ORDER BY startTime DESC")
     suspend fun getSessionsByTaskSync(taskId: Long): List<TimerSession>
+
+    @Query("SELECT * FROM timer_sessions ORDER BY startTime DESC")
+    suspend fun getAllTimerSessionsSync(): List<TimerSession>
 
     @Insert
     suspend fun insert(session: TimerSession): Long

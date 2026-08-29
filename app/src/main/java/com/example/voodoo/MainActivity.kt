@@ -1,14 +1,19 @@
 package com.example.voodoo
 
 import android.os.Bundle
+import android.widget.Toast
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
@@ -18,6 +23,9 @@ import androidx.navigation.navArgument
 import com.example.voodoo.presentation.MainViewModel
 import com.example.voodoo.presentation.screens.*
 import com.example.voodoo.ui.theme.VooDooTheme
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -31,7 +39,7 @@ class MainActivity : ComponentActivity() {
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
                 ) {
-                    VooDooNavHost()
+                    VooDooNavHost(mainViewModel)
                 }
             }
         }
@@ -39,8 +47,46 @@ class MainActivity : ComponentActivity() {
 }
 
 @androidx.compose.runtime.Composable
-fun VooDooNavHost() {
+fun VooDooNavHost(viewModel: MainViewModel) {
     val navController = rememberNavController()
+    val exportResult by viewModel.exportResult.collectAsState()
+    val importResult by viewModel.importResult.collectAsState()
+
+    val context = LocalContext.current
+
+    // Лаунчер для экспорта CSV
+    val exportLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.CreateDocument("text/csv")
+    ) { uri ->
+        uri?.let {
+            viewModel.exportData(it)
+        }
+    }
+
+    // Лаунчер для импорта CSV
+    val importLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocument()
+    ) { uri ->
+        uri?.let {
+            viewModel.importData(it)
+        }
+    }
+
+    // Обработка результата экспорта
+    LaunchedEffect(exportResult) {
+        exportResult?.let { message ->
+            Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
+            viewModel.clearExportResult()
+        }
+    }
+
+    // Обработка результата импорта
+    LaunchedEffect(importResult) {
+        importResult?.let { message ->
+            Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
+            viewModel.clearImportResult()
+        }
+    }
 
     NavHost(
         navController = navController,
@@ -88,8 +134,14 @@ fun VooDooNavHost() {
                 onBackClick = { navController.popBackStack() },
                 onContextsClick = { navController.navigate("contexts") },
                 onICalSyncClick = { navController.navigate("ical_sync") },
-                onExportClick = { /* TODO */ },
-                onImportClick = { /* TODO */ }
+                onExportClick = {
+                    val dateFormat = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault())
+                    val fileName = "voodoo_export_${dateFormat.format(Date())}.csv"
+                    exportLauncher.launch(fileName)
+                },
+                onImportClick = {
+                    importLauncher.launch(arrayOf("text/csv", "text/comma-separated-values", "text/plain", "*/*"))
+                }
             )
         }
 

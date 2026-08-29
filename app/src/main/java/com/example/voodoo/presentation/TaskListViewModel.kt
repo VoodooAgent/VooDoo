@@ -3,17 +3,12 @@ package com.example.voodoo.presentation
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.voodoo.VooDooApp
 import com.example.voodoo.data.AppDatabase
 import com.example.voodoo.data.ProjectContext
 import com.example.voodoo.data.Task
-import com.example.voodoo.service.ReminderScheduler
-import com.example.voodoo.service.TimerServiceManager
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class TaskListViewModel(application: Application) : AndroidViewModel(application) {
@@ -50,93 +45,35 @@ class TaskListViewModel(application: Application) : AndroidViewModel(application
         _selectedContextId.value = contextId
     }
 
-    fun toggleTaskExpanded(taskId: Long) {
-        val current = _expandedTaskIds.value
-        _expandedTaskIds.value = if (current.contains(taskId)) {
-            current - taskId
-        } else {
-            current + taskId
-        }
-    }
-
-    fun expandTask(taskId: Long) {
-        val current = _expandedTaskIds.value
-        if (!current.contains(taskId)) {
-            _expandedTaskIds.value = current + taskId
-        }
-    }
-
-    // СВЕРНУТЬ/РАЗВЕРНУТЬ ВСЕ ВЕТКИ СРАЗУ
-    fun toggleExpandAll() {
-        val current = _expandedTaskIds.value
-        if (current.isNotEmpty()) {
-            _expandedTaskIds.value = emptySet()
-        } else {
-            val all = allTasks.value
-            val parentIds = all.mapNotNull { it.parentId }.toSet()
-            _expandedTaskIds.value = all
-                .filter { parentIds.contains(it.id) }
-                .map { it.id }
-                .toSet()
-        }
-    }
-
     fun createTask(title: String, contextId: Long?, parentId: Long?) {
         viewModelScope.launch {
-            val level = if (parentId != null) {
-                val parent = withContext(Dispatchers.IO) {
-                    taskDao.getTaskById(parentId).first()
-                }
-                (parent?.level ?: 0) + 1
-            } else {
-                0
-            }
-            if (level > 6) {
-                throw IllegalStateException("Максимум 7 уровней вложенности")
-            }
-            val task = Task(
+            val parentTask = parentId?.let { taskDao.getTaskById(it).first() }
+            val newTask = Task(
                 title = title,
                 contextId = contextId,
                 parentId = parentId,
-                level = level
+                level = (parentTask?.level ?: 0) + if (parentId != null) 1 else 0,
+                sortOrder = (tasks.value.maxOfOrNull { it.sortOrder } ?: 0) + 1
             )
-            withContext(Dispatchers.IO) {
-                taskDao.insert(task)
-            }
+            taskDao.insert(newTask)
         }
     }
 
     fun updateTask(task: Task) {
         viewModelScope.launch {
-            withContext(Dispatchers.IO) {
-                taskDao.update(task)
-            }
-            ReminderScheduler.scheduleReminder(getApplication<VooDooApp>(), task)
-        }
-    }
-
-    fun deleteTask(task: Task) {
-        viewModelScope.launch {
-            ReminderScheduler.cancelReminder(getApplication<VooDooApp>(), task.id)
-            if (task.timerActive) {
-                TimerServiceManager.stopAllTimersForTask(getApplication<VooDooApp>(), task.id)
-            }
-            withContext(Dispatchers.IO) {
-                taskDao.delete(task)
-            }
+            taskDao.update(task)
         }
     }
 
     fun toggleTaskDone(task: Task) {
         viewModelScope.launch {
             val now = System.currentTimeMillis()
-            val isDone = !task.isDone
-            val completedAt = if (isDone) now else null
-            withContext(Dispatchers.IO) {
-                taskDao.updateTaskStatus(task.id, isDone, completedAt)
-            }
-            if (isDone && task.timerActive) {
-                TimerServiceManager.pauseTimer(getApplication<VooDooApp>(), task.id)
+            val completedAt = if (task.isDone) null else now
+            taskDao.updateTaskStatus(task.id, !task.isDone, completedAt)
+
+            // При выполнении задачи сворачиваем её детей
+            if (!task.isDone) {
+                collapseTask(task.id)
             }
         }
     }
@@ -147,83 +84,108 @@ class TaskListViewModel(application: Application) : AndroidViewModel(application
                 0 -> 1
                 1 -> 2
                 2 -> 3
-                3 -> 0
                 else -> 0
             }
-            withContext(Dispatchers.IO) {
-                taskDao.updatePriority(task.id, newPriority)
-            }
+            taskDao.updatePriority(task.id, newPriority)
+        }
+    }
+
+    fun deleteTask(task: Task) {
+        viewModelScope.launch {
+            taskDao.delete(task)
+        }
+    }
+
+    fun toggleTaskExpanded(taskId: Long) {
+        val current = _expandedTaskIds.value
+        _expandedTaskIds.value = if (current.contains(taskId)) {
+            current - taskId
+        } else {
+            current + taskId
+        }
+    }
+
+    fun expandTask(taskId: Long) {
+        _expandedTaskIds.value = _expandedTaskIds.value + taskId
+    }
+
+    fun collapseTask(taskId: Long) {
+        _expandedTaskIds.value = _expandedTaskIds.value - taskId
+    }
+
+    fun toggleExpandAll() {
+        val current = _expandedTaskIds.value
+        val visibleTasks = tasks.value.filter { !it.isDone }
+
+        if (visibleTasks.isEmpty()) return
+
+        // Находим все parentId среди видимых задач
+        val parentIds = visibleTasks.mapNotNull { it.parentId }.toSet()
+
+        // Родительские задачи - это задачи, которые являются родителями И сами видны
+        val visibleParentIds = visibleTasks
+            .filter { it.id in parentIds }
+            .map { it.id }
+            .toSet()
+
+        if (visibleParentIds.isEmpty()) return
+
+        // Проверяем, развёрнуты ли ВСЕ видимые родительские задачи
+        val allExpanded = visibleParentIds.all { it in current }
+
+        _expandedTaskIds.value = if (allExpanded) {
+            // Сворачиваем все видимые родительские задачи
+            current - visibleParentIds
+        } else {
+            // Разворачиваем все видимые родительские задачи
+            current + visibleParentIds
         }
     }
 
     fun startTimer(task: Task) {
         viewModelScope.launch {
-            try {
-                TimerServiceManager.startTimer(getApplication<VooDooApp>(), task.id)
-            } catch (e: IllegalStateException) {
-                // Превышен лимит таймеров
-            }
+            taskDao.updateTimerStatus(task.id, true, System.currentTimeMillis())
         }
     }
 
     fun pauseTimer(task: Task) {
         viewModelScope.launch {
-            TimerServiceManager.pauseTimer(getApplication<VooDooApp>(), task.id)
+            taskDao.updateTimerStatus(task.id, false, null)
         }
     }
 
-    fun updateSortOrder(taskId: Long, newSortOrder: Int) {
+    fun moveTaskUp(task: Task) {
         viewModelScope.launch {
-            withContext(Dispatchers.IO) {
-                taskDao.updateSortOrder(taskId, newSortOrder)
-            }
-        }
-    }
-
-    fun moveTask(task: Task, newContextId: Long?, newParentId: Long?) {
-        viewModelScope.launch {
-            withContext(Dispatchers.IO) {
-                taskDao.updateContext(task.id, newContextId)
-            }
-            if (newParentId != null) {
-                val parent = withContext(Dispatchers.IO) {
-                    taskDao.getTaskById(newParentId).first()
-                }
-                val newLevel = (parent?.level ?: 0) + 1
-                if (newLevel <= 6) {
-                    withContext(Dispatchers.IO) {
-                        taskDao.updateParent(task.id, newParentId, newLevel)
-                    }
-                }
+            val all = if (task.contextId != null) {
+                taskDao.getTasksByContext(task.contextId).first()
             } else {
-                withContext(Dispatchers.IO) {
-                    taskDao.updateParent(task.id, null, 0)
-                }
+                taskDao.getTasksWithoutContext().first()
+            }.filter { it.parentId == task.parentId && !it.isDone }
+                .sortedBy { it.sortOrder }
+
+            val index = all.indexOfFirst { it.id == task.id }
+            if (index > 0) {
+                val prev = all[index - 1]
+                taskDao.updateSortOrder(task.id, prev.sortOrder)
+                taskDao.updateSortOrder(prev.id, task.sortOrder)
             }
         }
     }
 
-    fun reorderTasks(reorderedTasks: List<Task>) {
+    fun moveTaskDown(task: Task) {
         viewModelScope.launch {
-            withContext(Dispatchers.IO) {
-                reorderedTasks.forEachIndexed { index, task ->
-                    if (task.sortOrder != index) {
-                        taskDao.updateSortOrder(task.id, index)
-                    }
-                }
-            }
-        }
-    }
+            val all = if (task.contextId != null) {
+                taskDao.getTasksByContext(task.contextId).first()
+            } else {
+                taskDao.getTasksWithoutContext().first()
+            }.filter { it.parentId == task.parentId && !it.isDone }
+                .sortedBy { it.sortOrder }
 
-    fun swapTasks(fromIndex: Int, toIndex: Int) {
-        viewModelScope.launch {
-            val currentTasks = tasks.value.toMutableList()
-            val task = currentTasks.removeAt(fromIndex)
-            currentTasks.add(toIndex, task)
-            withContext(Dispatchers.IO) {
-                currentTasks.forEachIndexed { index, task ->
-                    taskDao.updateSortOrder(task.id, index)
-                }
+            val index = all.indexOfFirst { it.id == task.id }
+            if (index < all.size - 1) {
+                val next = all[index + 1]
+                taskDao.updateSortOrder(task.id, next.sortOrder)
+                taskDao.updateSortOrder(next.id, task.sortOrder)
             }
         }
     }

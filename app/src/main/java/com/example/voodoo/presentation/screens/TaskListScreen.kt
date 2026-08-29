@@ -158,8 +158,6 @@ fun TaskListScreen(
         if (isColorDark(backgroundColor)) Color.White else Color(0xFF111111)
     }
 
-    val anyExpanded = expandedIds.isNotEmpty()
-
     val activeTasks = remember(tasks) {
         tasks
             .filter { !it.isDone }
@@ -170,6 +168,23 @@ fun TaskListScreen(
         activeTasks.filter { task ->
             task.parentId == null || activeTasks.none { it.id == task.parentId }
         }
+    }
+
+    // Находим все родительские задачи среди активных
+    val parentIds = remember(activeTasks) {
+        activeTasks.mapNotNull { it.parentId }.toSet()
+    }
+
+    val visibleParentIds = remember(activeTasks, parentIds) {
+        activeTasks
+            .filter { it.id in parentIds }
+            .map { it.id }
+            .toSet()
+    }
+
+    // Проверяем, развёрнуты ли все видимые родительские задачи
+    val allExpanded = remember(visibleParentIds, expandedIds) {
+        visibleParentIds.isNotEmpty() && visibleParentIds.all { it in expandedIds }
     }
 
     val doneTasks = remember(tasks) {
@@ -228,12 +243,12 @@ fun TaskListScreen(
                             modifier = Modifier.size(36.dp)
                         ) {
                             Icon(
-                                imageVector = if (anyExpanded) {
+                                imageVector = if (allExpanded) {
                                     Icons.Default.ExpandLess
                                 } else {
                                     Icons.Default.ExpandMore
                                 },
-                                contentDescription = if (anyExpanded) {
+                                contentDescription = if (allExpanded) {
                                     "Свернуть все ветки"
                                 } else {
                                     "Развернуть все ветки"
