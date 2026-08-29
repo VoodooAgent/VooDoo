@@ -80,12 +80,10 @@ private fun startOfWeek(): Long {
     calendar.set(Calendar.MINUTE, 0)
     calendar.set(Calendar.SECOND, 0)
     calendar.set(Calendar.MILLISECOND, 0)
-
     calendar.firstDayOfWeek = Calendar.MONDAY
     val dayOfWeek = calendar.get(Calendar.DAY_OF_WEEK)
     val daysFromMonday = (dayOfWeek - Calendar.MONDAY + 7) % 7
     calendar.add(Calendar.DAY_OF_MONTH, -daysFromMonday)
-
     return calendar.timeInMillis
 }
 
@@ -130,7 +128,6 @@ fun TaskListScreen(
     var showSwipeMenu by remember { mutableStateOf<Task?>(null) }
     var createParentId by remember { mutableStateOf<Long?>(null) }
 
-    // Секция «Выполнено» теперь по умолчанию СВЁРНУТА
     var completedExpanded by remember(contextId) { mutableStateOf(false) }
     var expandedPeriods by remember(contextId) { mutableStateOf<Set<String>>(emptySet()) }
 
@@ -158,10 +155,10 @@ fun TaskListScreen(
         if (isColorDark(backgroundColor)) Color.White else Color(0xFF111111)
     }
 
+    val anyExpanded = expandedIds.isNotEmpty()
+
     val activeTasks = remember(tasks) {
-        tasks
-            .filter { !it.isDone }
-            .sortedBy { it.sortOrder }
+        tasks.filter { !it.isDone }.sortedBy { it.sortOrder }
     }
 
     val visibleRootTasks = remember(activeTasks) {
@@ -170,27 +167,8 @@ fun TaskListScreen(
         }
     }
 
-    // Находим все родительские задачи среди активных
-    val parentIds = remember(activeTasks) {
-        activeTasks.mapNotNull { it.parentId }.toSet()
-    }
-
-    val visibleParentIds = remember(activeTasks, parentIds) {
-        activeTasks
-            .filter { it.id in parentIds }
-            .map { it.id }
-            .toSet()
-    }
-
-    // Проверяем, развёрнуты ли все видимые родительские задачи
-    val allExpanded = remember(visibleParentIds, expandedIds) {
-        visibleParentIds.isNotEmpty() && visibleParentIds.all { it in expandedIds }
-    }
-
     val doneTasks = remember(tasks) {
-        tasks
-            .filter { it.isDone }
-            .sortedByDescending { it.completedTime() }
+        tasks.filter { it.isDone }.sortedByDescending { it.completedTime() }
     }
 
     val todayStart = startOfToday()
@@ -199,60 +177,29 @@ fun TaskListScreen(
     val yearStart = startOfYear()
 
     val doneToday = doneTasks.filter { it.completedTime() >= todayStart }
-
-    val doneWeek = doneTasks.filter {
-        val time = it.completedTime()
-        time in weekStart until todayStart
-    }
-
-    val doneMonth = doneTasks.filter {
-        val time = it.completedTime()
-        time in monthStart until weekStart
-    }
-
-    val doneYear = doneTasks.filter {
-        val time = it.completedTime()
-        time in yearStart until monthStart
-    }
-
-    val doneAllTime = doneTasks.filter {
-        it.completedTime() < yearStart
-    }
+    val doneWeek = doneTasks.filter { it.completedTime() in weekStart until todayStart }
+    val doneMonth = doneTasks.filter { it.completedTime() in monthStart until weekStart }
+    val doneYear = doneTasks.filter { it.completedTime() in yearStart until monthStart }
+    val doneAllTime = doneTasks.filter { it.completedTime() < yearStart }
 
     val togglePeriod: (String) -> Unit = { key ->
-        expandedPeriods = if (key in expandedPeriods) {
-            expandedPeriods - key
-        } else {
-            expandedPeriods + key
-        }
+        expandedPeriods = if (key in expandedPeriods) expandedPeriods - key else expandedPeriods + key
     }
 
     Scaffold(
         topBar = {
             TopAppBar(
                 title = {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
                         Text(displayName)
-
                         Spacer(modifier = Modifier.width(4.dp))
-
                         IconButton(
                             onClick = { taskListViewModel.toggleExpandAll() },
                             modifier = Modifier.size(36.dp)
                         ) {
                             Icon(
-                                imageVector = if (allExpanded) {
-                                    Icons.Default.ExpandLess
-                                } else {
-                                    Icons.Default.ExpandMore
-                                },
-                                contentDescription = if (allExpanded) {
-                                    "Свернуть все ветки"
-                                } else {
-                                    "Развернуть все ветки"
-                                },
+                                imageVector = if (anyExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                                contentDescription = if (anyExpanded) "Свернуть все ветки" else "Развернуть все ветки",
                                 tint = barContentColor,
                                 modifier = Modifier.size(28.dp)
                             )
@@ -267,51 +214,39 @@ fun TaskListScreen(
                 ),
                 navigationIcon = {
                     IconButton(onClick = onBackClick) {
-                        Icon(
-                            Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "Назад"
-                        )
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Назад")
                     }
                 },
                 actions = {
                     IconButton(onClick = onPriorityClick) {
-                        Icon(
-                            Icons.Default.PriorityHigh,
-                            contentDescription = "Приоритетные задачи"
-                        )
+                        Icon(Icons.Default.PriorityHigh, contentDescription = "Приоритетные задачи")
                     }
                 }
             )
         },
         floatingActionButton = {
-            FloatingActionButton(
-                onClick = {
-                    createParentId = null
-                    showCreateDialog = true
-                }
-            ) {
+            FloatingActionButton(onClick = {
+                createParentId = null
+                showCreateDialog = true
+            }) {
                 Icon(Icons.Default.Add, contentDescription = "Добавить задачу")
             }
         }
     ) { padding ->
         LazyColumn(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding)
-                .background(backgroundColor),
+            modifier = Modifier.fillMaxSize().padding(padding).background(backgroundColor),
             verticalArrangement = Arrangement.spacedBy(2.dp),
             contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp)
         ) {
             items(visibleRootTasks, key = { it.id }) { task ->
                 TaskTreeItem(
                     task = task,
-                    level = 0,
                     expandedIds = expandedIds,
                     fontSize = settings.fontSize,
                     allTasks = activeTasks,
                     viewModel = taskListViewModel,
                     onTaskClick = onTaskClick,
-                    onSwipeLeft = { showSwipeMenu = task }
+                    onSwipeLeft = { swipedTask -> showSwipeMenu = swipedTask }
                 )
             }
 
@@ -329,12 +264,8 @@ fun TaskListScreen(
                 if (completedExpanded) {
                     if (doneToday.isNotEmpty()) {
                         item(key = "label_today") {
-                            PeriodLabel(
-                                text = "Сегодня",
-                                contentColor = barContentColor
-                            )
+                            PeriodLabel(text = "Сегодня", contentColor = barContentColor)
                         }
-
                         doneItems(
                             prefix = "today",
                             list = doneToday,
@@ -420,7 +351,7 @@ fun TaskListScreen(
                 showCreateDialog = true
                 showSwipeMenu = null
             },
-            onICalClick = { /* TODO */ },
+            onICalClick = { },
             onEditClick = { onTaskClick(task.id) },
             onDeleteClick = {
                 taskListViewModel.deleteTask(task)
@@ -438,13 +369,12 @@ fun TaskListScreen(
 @Composable
 fun TaskTreeItem(
     task: Task,
-    level: Int,
     expandedIds: Set<Long>,
     fontSize: Int,
     allTasks: List<Task>,
     viewModel: TaskListViewModel,
     onTaskClick: (Long) -> Unit,
-    onSwipeLeft: () -> Unit
+    onSwipeLeft: (Task) -> Unit
 ) {
     val children = allTasks.filter { it.parentId == task.id }
     val isExpanded = expandedIds.contains(task.id)
@@ -460,11 +390,7 @@ fun TaskTreeItem(
                     modifier = Modifier.size(28.dp)
                 ) {
                     Icon(
-                        imageVector = if (isExpanded) {
-                            Icons.Default.ExpandLess
-                        } else {
-                            Icons.Default.ExpandMore
-                        },
+                        imageVector = if (isExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
                         contentDescription = if (isExpanded) "Свернуть" else "Развернуть",
                         tint = Color.Black,
                         modifier = Modifier.size(18.dp)
@@ -481,41 +407,30 @@ fun TaskTreeItem(
                     onToggleDone = { viewModel.toggleTaskDone(task) },
                     onCyclePriority = { viewModel.cyclePriority(task) },
                     onToggleTimer = {
-                        if (task.timerActive) {
-                            viewModel.pauseTimer(task)
-                        } else {
-                            viewModel.startTimer(task)
-                        }
+                        if (task.timerActive) viewModel.pauseTimer(task)
+                        else viewModel.startTimer(task)
                     },
                     onClick = { onTaskClick(task.id) },
                     onSwipeRight = { viewModel.toggleTaskDone(task) },
-                    onSwipeLeft = onSwipeLeft
+                    onSwipeLeft = { onSwipeLeft(task) }
                 )
             }
         }
 
         if (isExpanded && children.isNotEmpty()) {
             Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(IntrinsicSize.Max)
+                modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Max)
             ) {
                 Spacer(modifier = Modifier.width(13.dp))
-
                 Box(
-                    modifier = Modifier
-                        .width(2.dp)
-                        .fillMaxHeight()
-                        .background(MaterialTheme.colorScheme.outlineVariant)
+                    modifier = Modifier.width(2.dp).fillMaxHeight().background(MaterialTheme.colorScheme.outlineVariant)
                 )
-
                 Spacer(modifier = Modifier.width(4.dp))
 
                 Column(modifier = Modifier.weight(1f)) {
                     children.forEach { child ->
                         TaskTreeItem(
                             task = child,
-                            level = level + 1,
                             expandedIds = expandedIds,
                             fontSize = fontSize,
                             allTasks = allTasks,
@@ -539,10 +454,7 @@ private fun CompletedSectionHeader(
     onToggle: () -> Unit
 ) {
     Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onToggle)
-            .padding(horizontal = 8.dp, vertical = 6.dp),
+        modifier = Modifier.fillMaxWidth().clickable(onClick = onToggle).padding(horizontal = 8.dp, vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Icon(
@@ -551,9 +463,7 @@ private fun CompletedSectionHeader(
             tint = contentColor,
             modifier = Modifier.size(22.dp)
         )
-
         Spacer(modifier = Modifier.width(6.dp))
-
         Text(
             text = "$title ($count)",
             style = MaterialTheme.typography.titleMedium,
@@ -571,11 +481,7 @@ private fun PeriodLabel(
         text = text,
         style = MaterialTheme.typography.labelLarge,
         color = contentColor.copy(alpha = 0.75f),
-        modifier = Modifier.padding(
-            start = 34.dp,
-            top = 4.dp,
-            bottom = 2.dp
-        )
+        modifier = Modifier.padding(start = 34.dp, top = 4.dp, bottom = 2.dp)
     )
 }
 
@@ -588,15 +494,7 @@ private fun CollapsiblePeriodHeader(
     onToggle: () -> Unit
 ) {
     Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onToggle)
-            .padding(
-                start = 18.dp,
-                end = 8.dp,
-                top = 4.dp,
-                bottom = 4.dp
-            ),
+        modifier = Modifier.fillMaxWidth().clickable(onClick = onToggle).padding(start = 18.dp, end = 8.dp, top = 4.dp, bottom = 4.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Icon(
@@ -605,9 +503,7 @@ private fun CollapsiblePeriodHeader(
             tint = contentColor.copy(alpha = 0.85f),
             modifier = Modifier.size(18.dp)
         )
-
         Spacer(modifier = Modifier.width(6.dp))
-
         Text(
             text = "$title ($count)",
             style = MaterialTheme.typography.labelLarge,
@@ -631,11 +527,8 @@ private fun LazyListScope.doneItems(
             onToggleDone = { viewModel.toggleTaskDone(task) },
             onCyclePriority = { viewModel.cyclePriority(task) },
             onToggleTimer = {
-                if (task.timerActive) {
-                    viewModel.pauseTimer(task)
-                } else {
-                    viewModel.startTimer(task)
-                }
+                if (task.timerActive) viewModel.pauseTimer(task)
+                else viewModel.startTimer(task)
             },
             onClick = { onTaskClick(task.id) },
             onSwipeRight = { viewModel.toggleTaskDone(task) },

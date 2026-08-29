@@ -32,6 +32,7 @@ object ICalPublisher {
                 calendar.properties.add(ProdId("-//VooDoo Task Tracker//RU"))
                 calendar.properties.add(Version.VERSION_2_0)
                 calendar.properties.add(CalScale.GREGORIAN)
+                calendar.properties.add(Method.PUBLISH)
 
                 val allTasks = taskDao.getAllTasks().first()
                 val filteredTasks = allTasks.filter { task ->
@@ -52,7 +53,7 @@ object ICalPublisher {
                 }
 
                 val calendarFile = File(context.getExternalFilesDir(null), "voodoo_calendar.ics")
-                val outputter = CalendarOutputter()
+                val outputter = CalendarOutputter(false)
                 FileOutputStream(calendarFile).use { outputStream ->
                     outputter.output(calendar, outputStream)
                 }
@@ -66,36 +67,52 @@ object ICalPublisher {
     }
 
     private fun createPlannedEvent(task: Task): VEvent {
-        val startDate = net.fortuna.ical4j.model.Date(task.plannedStart!!)
-        val endDate = net.fortuna.ical4j.model.Date(task.plannedEnd!!)
+        val startDate = net.fortuna.ical4j.model.DateTime(task.plannedStart!!)
+        val endDate = net.fortuna.ical4j.model.DateTime(task.plannedEnd!!)
 
-        val event = VEvent(startDate, endDate, task.title)
+        val title = if (task.isDone) "✓ " + task.title else task.title
+        val event = VEvent(startDate, endDate, title)
+
+        event.properties.add(Uid("voodoo-task-" + task.id + "-" + UUID.randomUUID()))
+        event.properties.add(DtStamp())
+        event.properties.add(Organizer("mailto:voodoo@local.app"))
+
+        val descriptionParts = mutableListOf<String>()
 
         if (task.description.isNotBlank()) {
-            event.properties.add(Description(task.description))
+            descriptionParts.add("Описание: " + task.description)
         }
 
         if (task.result.isNotBlank()) {
-            event.properties.add(Comment("Результат: ${task.result}"))
+            descriptionParts.add("Результат: " + task.result)
         }
 
-        val statusValue = if (task.isDone) "COMPLETED" else "CONFIRMED"
-        event.properties.add(Status(statusValue))
+        if (descriptionParts.isNotEmpty()) {
+            event.properties.add(Description(descriptionParts.joinToString("\n\n")))
+        }
+
+        // ИСПРАВЛЕНО: в ical4j 3.x нет Status.CONFIRMED, используем конструктор
+        event.properties.add(Status("CONFIRMED"))
 
         return event
     }
 
     private fun createTimerSessionEvent(task: Task, session: TimerSession): VEvent {
-        val startDate = net.fortuna.ical4j.model.Date(session.startTime)
-        val endDate = net.fortuna.ical4j.model.Date(session.endTime)
+        val startDate = net.fortuna.ical4j.model.DateTime(session.startTime)
+        val endDate = net.fortuna.ical4j.model.DateTime(session.endTime)
 
         val durationMinutes = session.duration / (60 * 1000)
-        val title = "${task.title} (работа: ${durationMinutes} мин)"
+        val title = task.title + " (работа: " + durationMinutes + " мин)"
 
         val event = VEvent(startDate, endDate, title)
 
+        event.properties.add(Uid("voodoo-session-" + session.id + "-" + UUID.randomUUID()))
+        event.properties.add(DtStamp())
+        event.properties.add(Organizer("mailto:voodoo@local.app"))
         event.properties.add(Comment("Фактическое время работы над задачей"))
         event.properties.add(Categories("Work Session"))
+        // ИСПРАВЛЕНО: аналогично
+        event.properties.add(Status("CONFIRMED"))
 
         return event
     }

@@ -1,5 +1,6 @@
 package com.example.voodoo.presentation.screens
 
+import android.content.Intent
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -10,6 +11,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import androidx.core.content.FileProvider
 import com.example.voodoo.VooDooApp
 import com.example.voodoo.data.AppDatabase
 import com.example.voodoo.data.ProjectContext
@@ -84,14 +86,27 @@ fun ICalSyncScreen(
                 onClick = {
                     scope.launch {
                         val file = ICalPublisher.publishCalendar(VooDooApp.instance)
-                        file?.let {
-                            // Показать сообщение об успехе
+                        if (file != null && file.exists()) {
+                            val uri = FileProvider.getUriForFile(
+                                VooDooApp.instance,
+                                "${VooDooApp.instance.packageName}.fileprovider",
+                                file
+                            )
+                            val shareIntent = Intent(Intent.ACTION_SEND).apply {
+                                type = "text/calendar"
+                                putExtra(Intent.EXTRA_STREAM, uri)
+                                putExtra(Intent.EXTRA_SUBJECT, "VooDoo Экспорт календаря")
+                                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                            }
+                            val chooserIntent = Intent.createChooser(shareIntent, "Отправить календарь")
+                            chooserIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                            VooDooApp.instance.startActivity(chooserIntent)
                         }
                     }
                 },
                 modifier = Modifier.fillMaxWidth()
             ) {
-                Text("Экспортировать календарь")
+                Text("Экспортировать и отправить")
             }
         }
     }
