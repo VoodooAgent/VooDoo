@@ -6,15 +6,20 @@ import androidx.lifecycle.viewModelScope
 import com.example.voodoo.data.AppDatabase
 import com.example.voodoo.data.ProjectContext
 import com.example.voodoo.data.Task
+import com.example.voodoo.data.TimerSession
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class TaskListViewModel(application: Application) : AndroidViewModel(application) {
+
     private val database = AppDatabase.getDatabase(application)
     private val taskDao = database.taskDao()
     private val contextDao = database.contextDao()
+    private val sessionDao = database.timerSessionDao()
 
     private val _selectedContextId = MutableStateFlow<Long?>(null)
     val selectedContextId: StateFlow<Long?> = _selectedContextId.asStateFlow()
@@ -68,11 +73,32 @@ class TaskListViewModel(application: Application) : AndroidViewModel(application
     fun toggleTaskDone(task: Task) {
         viewModelScope.launch {
             val now = System.currentTimeMillis()
-            val completedAt = if (task.isDone) null else now
-            taskDao.updateTaskStatus(task.id, !task.isDone, completedAt)
+            val isBecomingDone = !task.isDone
+            val completedAt = if (isBecomingDone) now else null
 
-            // При выполнении задачи сворачиваем её детей
-            if (!task.isDone) {
+            withContext(Dispatchers.IO) {
+                // ЗАПРОС АКТУАЛЬНОГО СОСТОЯНИЯ: берем задачу прямо из БД,
+                // чтобы исключить рассинхронизацию с UI (например, при очень быстром клике)
+                val currentTask = taskDao.getTaskById(task.id).first()
+
+                if (currentTask != null) {
+                    if (isBecomingDone && currentTask.timerActive && currentTask.timerStartedAt != null) {
+                        val duration = now - currentTask.timerStartedAt
+                        val session = TimerSession(
+                            taskId = task.id,
+                            startTime = currentTask.timerStartedAt,
+                            endTime = now,
+                            duration = duration
+                        )
+                        sessionDao.insert(session)
+                        taskDao.updateTimerStatus(task.id, false, null)
+                    }
+
+                    taskDao.updateTaskStatus(task.id, isBecomingDone, completedAt)
+                }
+            }
+
+            if (isBecomingDone) {
                 collapseTask(task.id)
             }
         }
@@ -116,13 +142,9 @@ class TaskListViewModel(application: Application) : AndroidViewModel(application
     fun toggleExpandAll() {
         val current = _expandedTaskIds.value
         val visibleTasks = tasks.value.filter { !it.isDone }
-
         if (visibleTasks.isEmpty()) return
 
-        // Находим все parentId среди видимых задач
         val parentIds = visibleTasks.mapNotNull { it.parentId }.toSet()
-
-        // Родительские задачи - это задачи, которые являются родителями И сами видны
         val visibleParentIds = visibleTasks
             .filter { it.id in parentIds }
             .map { it.id }
@@ -130,14 +152,10 @@ class TaskListViewModel(application: Application) : AndroidViewModel(application
 
         if (visibleParentIds.isEmpty()) return
 
-        // Проверяем, развёрнуты ли ВСЕ видимые родительские задачи
         val allExpanded = visibleParentIds.all { it in current }
-
         _expandedTaskIds.value = if (allExpanded) {
-            // Сворачиваем все видимые родительские задачи
             current - visibleParentIds
         } else {
-            // Разворачиваем все видимые родительские задачи
             current + visibleParentIds
         }
     }
@@ -150,7 +168,25 @@ class TaskListViewModel(application: Application) : AndroidViewModel(application
 
     fun pauseTimer(task: Task) {
         viewModelScope.launch {
-            taskDao.updateTimerStatus(task.id, false, null)
+            val currentTask = taskDao.getTaskById(task.id).first()
+            currentTask?.let {
+                if (it.timerActive && it.timerStartedAt != null) {
+                    val now = System.currentTimeMillis()
+                    val duration = now - it.timerStartedAt
+                    val session = TimerSession(
+                        taskId = task.id,
+                        startTime = it.timerStartedAt,
+                        endTime = now,
+                        duration = duration
+                    )
+                    withContext(Dispatchers.IO) {
+                        sessionDao.insert(session)
+                        taskDao.updateTimerStatus(task.id, false, null)
+                    }
+                } else {
+                    taskDao.updateTimerStatus(task.id, false, null)
+                }
+            }
         }
     }
 
@@ -162,7 +198,6 @@ class TaskListViewModel(application: Application) : AndroidViewModel(application
                 taskDao.getTasksWithoutContext().first()
             }.filter { it.parentId == task.parentId && !it.isDone }
                 .sortedBy { it.sortOrder }
-
             val index = all.indexOfFirst { it.id == task.id }
             if (index > 0) {
                 val prev = all[index - 1]
@@ -180,7 +215,6 @@ class TaskListViewModel(application: Application) : AndroidViewModel(application
                 taskDao.getTasksWithoutContext().first()
             }.filter { it.parentId == task.parentId && !it.isDone }
                 .sortedBy { it.sortOrder }
-
             val index = all.indexOfFirst { it.id == task.id }
             if (index < all.size - 1) {
                 val next = all[index + 1]
