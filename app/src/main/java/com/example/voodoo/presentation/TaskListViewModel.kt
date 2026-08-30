@@ -30,6 +30,12 @@ class TaskListViewModel(application: Application) : AndroidViewModel(application
     val allTasks: StateFlow<List<Task>> = taskDao.getAllTasks()
         .stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
 
+    val taskDurations: StateFlow<Map<Long, Long>> = sessionDao.getAllSessions()
+        .map { sessions ->
+            sessions.groupBy { it.taskId }.mapValues { it.value.sumOf { s -> s.duration } }
+        }
+        .stateIn(viewModelScope, SharingStarted.Lazily, emptyMap())
+
     val contexts: StateFlow<List<ProjectContext>> = contextDao.getAllContexts()
         .stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
 

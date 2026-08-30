@@ -123,6 +123,7 @@ fun TaskListScreen(
     val contexts by taskListViewModel.contexts.collectAsState()
     val expandedIds by taskListViewModel.expandedTaskIds.collectAsState()
     val settings by mainViewModel.settings.collectAsState()
+    val durations by taskListViewModel.taskDurations.collectAsState()
 
     var showCreateDialog by remember { mutableStateOf(false) }
     var showSwipeMenu by remember { mutableStateOf<Task?>(null) }
@@ -245,6 +246,7 @@ fun TaskListScreen(
                     fontSize = settings.fontSize,
                     allTasks = activeTasks,
                     viewModel = taskListViewModel,
+                    durations = durations,
                     onTaskClick = onTaskClick,
                     onSwipeLeft = { swipedTask -> showSwipeMenu = swipedTask }
                 )
@@ -271,6 +273,7 @@ fun TaskListScreen(
                             list = doneToday,
                             fontSize = settings.fontSize,
                             viewModel = taskListViewModel,
+                            durations = durations,
                             onTaskClick = onTaskClick,
                             onSwipeMenuRequest = { showSwipeMenu = it }
                         )
@@ -285,6 +288,7 @@ fun TaskListScreen(
                         contentColor = barContentColor,
                         fontSize = settings.fontSize,
                         viewModel = taskListViewModel,
+                        durations = durations,
                         onTaskClick = onTaskClick,
                         onSwipeMenuRequest = { showSwipeMenu = it }
                     )
@@ -298,6 +302,7 @@ fun TaskListScreen(
                         contentColor = barContentColor,
                         fontSize = settings.fontSize,
                         viewModel = taskListViewModel,
+                        durations = durations,
                         onTaskClick = onTaskClick,
                         onSwipeMenuRequest = { showSwipeMenu = it }
                     )
@@ -311,6 +316,7 @@ fun TaskListScreen(
                         contentColor = barContentColor,
                         fontSize = settings.fontSize,
                         viewModel = taskListViewModel,
+                        durations = durations,
                         onTaskClick = onTaskClick,
                         onSwipeMenuRequest = { showSwipeMenu = it }
                     )
@@ -324,6 +330,7 @@ fun TaskListScreen(
                         contentColor = barContentColor,
                         fontSize = settings.fontSize,
                         viewModel = taskListViewModel,
+                        durations = durations,
                         onTaskClick = onTaskClick,
                         onSwipeMenuRequest = { showSwipeMenu = it }
                     )
@@ -373,6 +380,7 @@ fun TaskTreeItem(
     fontSize: Int,
     allTasks: List<Task>,
     viewModel: TaskListViewModel,
+    durations: Map<Long, Long>,
     onTaskClick: (Long) -> Unit,
     onSwipeLeft: (Task) -> Unit
 ) {
@@ -403,6 +411,7 @@ fun TaskTreeItem(
             Box(modifier = Modifier.weight(1f)) {
                 TaskCard(
                     task = task,
+                    pastSessionsDuration = durations[task.id] ?: 0L,
                     fontSize = fontSize,
                     onToggleDone = { viewModel.toggleTaskDone(task) },
                     onCyclePriority = { viewModel.cyclePriority(task) },
@@ -435,6 +444,7 @@ fun TaskTreeItem(
                             fontSize = fontSize,
                             allTasks = allTasks,
                             viewModel = viewModel,
+                            durations = durations,
                             onTaskClick = onTaskClick,
                             onSwipeLeft = onSwipeLeft
                         )
@@ -517,12 +527,14 @@ private fun LazyListScope.doneItems(
     list: List<Task>,
     fontSize: Int,
     viewModel: TaskListViewModel,
+    durations: Map<Long, Long>,
     onTaskClick: (Long) -> Unit,
     onSwipeMenuRequest: (Task) -> Unit
 ) {
     items(list, key = { "${prefix}_${it.id}" }) { task ->
         TaskCard(
             task = task,
+            pastSessionsDuration = durations[task.id] ?: 0L,
             fontSize = fontSize,
             onToggleDone = { viewModel.toggleTaskDone(task) },
             onCyclePriority = { viewModel.cyclePriority(task) },
@@ -546,6 +558,7 @@ private fun LazyListScope.collapsiblePeriod(
     contentColor: Color,
     fontSize: Int,
     viewModel: TaskListViewModel,
+    durations: Map<Long, Long>,
     onTaskClick: (Long) -> Unit,
     onSwipeMenuRequest: (Task) -> Unit
 ) {
@@ -569,6 +582,7 @@ private fun LazyListScope.collapsiblePeriod(
             list = list,
             fontSize = fontSize,
             viewModel = viewModel,
+            durations = durations,
             onTaskClick = onTaskClick,
             onSwipeMenuRequest = onSwipeMenuRequest
         )

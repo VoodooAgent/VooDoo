@@ -104,6 +104,9 @@ interface TimerSessionDao {
     @Query("SELECT * FROM timer_sessions ORDER BY startTime DESC")
     suspend fun getAllTimerSessionsSync(): List<TimerSession>
 
+    @Query("SELECT * FROM timer_sessions")
+    fun getAllSessions(): Flow<List<TimerSession>>
+
     @Insert
     suspend fun insert(session: TimerSession): Long
 

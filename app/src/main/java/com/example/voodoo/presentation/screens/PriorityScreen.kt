@@ -49,6 +49,7 @@ fun PriorityScreen(
     val priorityTasks by taskListViewModel.priorityTasks.collectAsState()
     val contexts by taskListViewModel.contexts.collectAsState()
     val settings by mainViewModel.settings.collectAsState()
+    val durations by taskListViewModel.taskDurations.collectAsState()
 
     var showSwipeMenu by remember { mutableStateOf<Task?>(null) }
     var showCreateDialog by remember { mutableStateOf(false) }
@@ -141,6 +142,7 @@ fun PriorityScreen(
                     PriorityContextSection(
                         contextName = contextName,
                         tasks = tasks,
+                        durations = durations,
                         fontSize = settings.fontSize,
                         expanded = !collapsedContexts.contains(contextId),
                         onToggleExpanded = {
@@ -203,6 +205,7 @@ fun PriorityScreen(
 fun PriorityContextSection(
     contextName: String,
     tasks: List<Task>,
+    durations: Map<Long, Long>,
     fontSize: Int,
     expanded: Boolean,
     onToggleExpanded: () -> Unit,
@@ -251,6 +254,7 @@ fun PriorityContextSection(
                     tasks.forEach { task ->
                         TaskCard(
                             task = task,
+                            pastSessionsDuration = durations[task.id] ?: 0L,
                             fontSize = fontSize,
                             onToggleDone = { viewModel.toggleTaskDone(task) },
                             onCyclePriority = { viewModel.cyclePriority(task) },

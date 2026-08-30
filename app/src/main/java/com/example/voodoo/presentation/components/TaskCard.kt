@@ -25,6 +25,7 @@ import kotlinx.coroutines.delay
 @Composable
 fun TaskCard(
     task: Task,
+    pastSessionsDuration: Long = 0L,
     fontSize: Int = 16,
     onToggleDone: () -> Unit,
     onCyclePriority: () -> Unit,
@@ -37,14 +38,14 @@ fun TaskCard(
     var offsetX by remember { mutableFloatStateOf(0f) }
     var currentTimerDuration by remember { mutableLongStateOf(0L) }
 
-    LaunchedEffect(task.timerActive, task.timerStartedAt) {
+    LaunchedEffect(task.timerActive, task.timerStartedAt, pastSessionsDuration) {
         if (task.timerActive && task.timerStartedAt != null) {
             while (true) {
-                currentTimerDuration = System.currentTimeMillis() - task.timerStartedAt
+                currentTimerDuration = pastSessionsDuration + (System.currentTimeMillis() - task.timerStartedAt)
                 delay(1000)
             }
         } else {
-            currentTimerDuration = 0L
+            currentTimerDuration = pastSessionsDuration
         }
     }
 
