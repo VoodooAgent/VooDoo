@@ -38,13 +38,17 @@ fun TaskCard(
     var offsetX by remember { mutableFloatStateOf(0f) }
     var currentTimerDuration by remember { mutableLongStateOf(0L) }
 
+    // LaunchedEffect реагирует на изменения статуса таймера и обновлений из БД (pastSessionsDuration)
     LaunchedEffect(task.timerActive, task.timerStartedAt, pastSessionsDuration) {
         if (task.timerActive && task.timerStartedAt != null) {
             while (true) {
-                currentTimerDuration = pastSessionsDuration + (System.currentTimeMillis() - task.timerStartedAt)
+                // Если таймер запущен — показываем ТОЛЬКО время текущей сессии
+                currentTimerDuration = (System.currentTimeMillis() - task.timerStartedAt).coerceAtLeast(0L)
                 delay(1000)
             }
         } else {
+            // Если таймер не запущен (остановлен кнопкой или завершением задачи) —
+            // показываем суммарное время всех прошлых сессий из БД
             currentTimerDuration = pastSessionsDuration
         }
     }
