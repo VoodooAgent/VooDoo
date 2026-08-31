@@ -47,6 +47,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.voodoo.data.Task
@@ -116,6 +117,7 @@ fun TaskListScreen(
     onBackClick: () -> Unit,
     onTaskClick: (Long) -> Unit,
     onPriorityClick: () -> Unit,
+    onRoutineClick: () -> Unit,
     taskListViewModel: TaskListViewModel = viewModel(),
     mainViewModel: MainViewModel = viewModel()
 ) {
@@ -219,6 +221,15 @@ fun TaskListScreen(
                     }
                 },
                 actions = {
+                    // Кнопка "R" для рутины — перед кнопкой "!"
+                    IconButton(onClick = onRoutineClick) {
+                        Text(
+                            text = "R",
+                            color = barContentColor,
+                            fontWeight = FontWeight.Bold,
+                            style = MaterialTheme.typography.titleMedium
+                        )
+                    }
                     IconButton(onClick = onPriorityClick) {
                         Icon(Icons.Default.PriorityHigh, contentDescription = "Приоритетные задачи")
                     }

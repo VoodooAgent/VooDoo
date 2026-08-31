@@ -15,6 +15,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.voodoo.data.ProjectContext
@@ -24,6 +25,7 @@ import com.example.voodoo.presentation.ContextListViewModel
 @Composable
 fun ContextsManagementScreen(
     onBackClick: () -> Unit,
+    onRoutineClick: () -> Unit,
     viewModel: ContextListViewModel = viewModel()
 ) {
     val contexts by viewModel.contexts.collectAsState()
@@ -48,6 +50,11 @@ fun ContextsManagementScreen(
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
+            // Пункт "Рутина" — специальный виртуальный контекст
+            item(key = "routine_virtual") {
+                RoutineManagementCard(onClick = onRoutineClick)
+            }
+
             items(contexts) { context ->
                 ContextManagementCard(
                     context = context,
@@ -67,6 +74,40 @@ fun ContextsManagementScreen(
                 editingContext = null
             }
         )
+    }
+}
+
+@Composable
+fun RoutineManagementCard(onClick: () -> Unit) {
+    Card(
+        modifier = Modifier.fillMaxWidth().clickable(onClick = onClick)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(28.dp)
+                    .background(MaterialTheme.colorScheme.primary, CircleShape),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = "R",
+                    color = MaterialTheme.colorScheme.onPrimary,
+                    fontWeight = FontWeight.Bold,
+                    style = MaterialTheme.typography.titleSmall
+                )
+            }
+            Spacer(modifier = Modifier.width(12.dp))
+            Text(
+                text = "Рутина",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Medium
+            )
+        }
     }
 }
 

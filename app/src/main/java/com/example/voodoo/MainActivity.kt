@@ -33,7 +33,6 @@ class MainActivity : ComponentActivity() {
         setContent {
             val mainViewModel: MainViewModel = viewModel()
             val isDarkTheme by mainViewModel.isDarkTheme.collectAsState()
-
             VooDooTheme(darkTheme = isDarkTheme) {
                 Surface(
                     modifier = Modifier.fillMaxSize(),
@@ -49,9 +48,9 @@ class MainActivity : ComponentActivity() {
 @androidx.compose.runtime.Composable
 fun VooDooNavHost(viewModel: MainViewModel) {
     val navController = rememberNavController()
+
     val exportResult by viewModel.exportResult.collectAsState()
     val importResult by viewModel.importResult.collectAsState()
-
     val context = LocalContext.current
 
     // Лаунчер для экспорта CSV
@@ -104,7 +103,6 @@ fun VooDooNavHost(viewModel: MainViewModel) {
                 onSettingsClick = { navController.navigate("settings") }
             )
         }
-
         composable(
             route = "context/{contextId}",
             arguments = listOf(navArgument("contextId") { type = NavType.LongType })
@@ -115,20 +113,20 @@ fun VooDooNavHost(viewModel: MainViewModel) {
                 contextName = "Контекст",
                 onBackClick = { navController.popBackStack() },
                 onTaskClick = { taskId -> navController.navigate("task/$taskId") },
-                onPriorityClick = { navController.navigate("priority") }
+                onPriorityClick = { navController.navigate("priority") },
+                onRoutineClick = { navController.navigate("routine") }
             )
         }
-
         composable("context_no") {
             TaskListScreen(
                 contextId = null,
                 contextName = "Без контекста",
                 onBackClick = { navController.popBackStack() },
                 onTaskClick = { taskId -> navController.navigate("task/$taskId") },
-                onPriorityClick = { navController.navigate("priority") }
+                onPriorityClick = { navController.navigate("priority") },
+                onRoutineClick = { navController.navigate("routine") }
             )
         }
-
         composable("settings") {
             SettingsScreen(
                 onBackClick = { navController.popBackStack() },
@@ -144,11 +142,12 @@ fun VooDooNavHost(viewModel: MainViewModel) {
                 }
             )
         }
-
         composable("contexts") {
-            ContextsManagementScreen(onBackClick = { navController.popBackStack() })
+            ContextsManagementScreen(
+                onBackClick = { navController.popBackStack() },
+                onRoutineClick = { navController.navigate("routine") }
+            )
         }
-
         composable(
             route = "task/{taskId}",
             arguments = listOf(navArgument("taskId") { type = NavType.LongType })
@@ -159,14 +158,18 @@ fun VooDooNavHost(viewModel: MainViewModel) {
                 onBackClick = { navController.popBackStack() }
             )
         }
-
         composable("priority") {
             PriorityScreen(
                 onBackClick = { navController.popBackStack() },
                 onTaskClick = { taskId -> navController.navigate("task/$taskId") }
             )
         }
-
+        composable("routine") {
+            RoutineScreen(
+                onBackClick = { navController.popBackStack() },
+                onTaskClick = { taskId -> navController.navigate("task/$taskId") }
+            )
+        }
         composable("ical_sync") {
             ICalSyncScreen(onBackClick = { navController.popBackStack() })
         }

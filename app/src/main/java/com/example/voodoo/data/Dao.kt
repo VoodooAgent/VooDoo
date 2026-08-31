@@ -47,8 +47,13 @@ interface TaskDao {
     @Query("SELECT * FROM tasks WHERE id = :taskId")
     fun getTaskById(taskId: Long): Flow<Task?>
 
-    @Query("SELECT * FROM tasks WHERE priority > 0 ORDER BY priority DESC, sortOrder ASC")
+    // Приоритетные задачи: только 1-3 звезды (без рутины)
+    @Query("SELECT * FROM tasks WHERE priority > 0 AND priority < 4 ORDER BY priority DESC, sortOrder ASC")
     fun getPriorityTasks(): Flow<List<Task>>
+
+    // Рутинные задачи: только приоритет R (4)
+    @Query("SELECT * FROM tasks WHERE priority = 4 ORDER BY contextId ASC, sortOrder ASC")
+    fun getRoutineTasks(): Flow<List<Task>>
 
     @Query("SELECT * FROM tasks WHERE timerActive = 1")
     suspend fun getActiveTimerTasks(): List<Task>
@@ -84,8 +89,8 @@ interface TaskDao {
     suspend fun updateTimerStatus(taskId: Long, active: Boolean, startedAt: Long?)
 
     @Query("""
-        UPDATE tasks 
-        SET parentId = NULL, level = 0 
+        UPDATE tasks
+        SET parentId = NULL, level = 0
         WHERE id IN (SELECT id FROM tasks WHERE parentId IN (
             SELECT id FROM tasks WHERE parentId = :parentId
         ))

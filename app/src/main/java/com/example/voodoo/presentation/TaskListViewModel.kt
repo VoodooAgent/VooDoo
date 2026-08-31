@@ -49,7 +49,12 @@ class TaskListViewModel(application: Application) : AndroidViewModel(application
         }
         .stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
 
+    // Приоритетные задачи: только 1, 2, 3 звезды (без рутины)
     val priorityTasks: StateFlow<List<Task>> = taskDao.getPriorityTasks()
+        .stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
+
+    // Рутинные задачи: только приоритет R (4)
+    val routineTasks: StateFlow<List<Task>> = taskDao.getRoutineTasks()
         .stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
 
     fun selectContext(contextId: Long?) {
@@ -83,8 +88,6 @@ class TaskListViewModel(application: Application) : AndroidViewModel(application
             val completedAt = if (isBecomingDone) now else null
 
             withContext(Dispatchers.IO) {
-                // ЗАПРОС АКТУАЛЬНОГО СОСТОЯНИЯ: берем задачу прямо из БД,
-                // чтобы исключить рассинхронизацию с UI (например, при очень быстром клике)
                 val currentTask = taskDao.getTaskById(task.id).first()
 
                 if (currentTask != null) {
@@ -112,10 +115,13 @@ class TaskListViewModel(application: Application) : AndroidViewModel(application
 
     fun cyclePriority(task: Task) {
         viewModelScope.launch {
+            // Цикл: 0 → 1 → 2 → 3 → 4 (R) → 0
             val newPriority = when (task.priority) {
                 0 -> 1
                 1 -> 2
                 2 -> 3
+                3 -> 4
+                4 -> 0
                 else -> 0
             }
             taskDao.updatePriority(task.id, newPriority)

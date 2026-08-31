@@ -38,17 +38,13 @@ fun TaskCard(
     var offsetX by remember { mutableFloatStateOf(0f) }
     var currentTimerDuration by remember { mutableLongStateOf(0L) }
 
-    // LaunchedEffect реагирует на изменения статуса таймера и обновлений из БД (pastSessionsDuration)
     LaunchedEffect(task.timerActive, task.timerStartedAt, pastSessionsDuration) {
         if (task.timerActive && task.timerStartedAt != null) {
             while (true) {
-                // Если таймер запущен — показываем ТОЛЬКО время текущей сессии
                 currentTimerDuration = (System.currentTimeMillis() - task.timerStartedAt).coerceAtLeast(0L)
                 delay(1000)
             }
         } else {
-            // Если таймер не запущен (остановлен кнопкой или завершением задачи) —
-            // показываем суммарное время всех прошлых сессий из БД
             currentTimerDuration = pastSessionsDuration
         }
     }
@@ -87,7 +83,7 @@ fun TaskCard(
                 .padding(horizontal = 6.dp, vertical = 2.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            PriorityStars(
+            PriorityIndicator(
                 priority = task.priority,
                 onCycle = onCyclePriority,
                 iconSize = (14 * fontScale).dp,
@@ -124,27 +120,64 @@ fun TaskCard(
     }
 }
 
+/**
+ * Вертикальный индикатор приоритета.
+ *
+ * Состояния (сверху вниз):
+ *  0 — все три звезды серые
+ *  1 — нижняя звезда закрашена
+ *  2 — нижняя и средняя закрашены
+ *  3 — все три закрашены
+ *  4 — вместо звёзд буква "R"
+ */
 @Composable
-fun PriorityStars(
+fun PriorityIndicator(
     priority: Int,
     onCycle: () -> Unit,
     iconSize: androidx.compose.ui.unit.Dp = 14.dp,
     modifier: Modifier = Modifier
 ) {
-    Row(
+    val filledTint = Color(0xFFFFD700)
+    val emptyTint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.25f)
+
+    Column(
         modifier = modifier.clickable(onClick = onCycle),
-        horizontalArrangement = Arrangement.spacedBy(1.dp)
+        verticalArrangement = Arrangement.Center,
+        horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        repeat(3) { index ->
-            val isFilled = index < priority
+        if (priority == 4) {
+            // Состояние 4: буква "R" вместо звёзд
+            Text(
+                text = "R",
+                color = MaterialTheme.colorScheme.primary,
+                fontSize = TextUnit(iconSize.value * 1.4f, TextUnitType.Sp),
+                fontWeight = FontWeight.Bold,
+                lineHeight = TextUnit(iconSize.value * 1.4f, TextUnitType.Sp)
+            )
+        } else {
+            // Состояния 0–3: три звезды, заполняются снизу вверх
+
+            // Верхняя звезда (заполнена только при приоритете 3)
             Icon(
-                imageVector = if (isFilled) Icons.Default.Star else Icons.Outlined.StarOutline,
-                contentDescription = "Приоритет ${index + 1}",
-                tint = if (isFilled) {
-                    Color(0xFFFFD700)
-                } else {
-                    MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f)
-                },
+                imageVector = if (priority >= 3) Icons.Default.Star else Icons.Outlined.StarOutline,
+                contentDescription = null,
+                tint = if (priority >= 3) filledTint else emptyTint,
+                modifier = Modifier.size(iconSize)
+            )
+
+            // Средняя звезда (заполнена при приоритете 2 и 3)
+            Icon(
+                imageVector = if (priority >= 2) Icons.Default.Star else Icons.Outlined.StarOutline,
+                contentDescription = null,
+                tint = if (priority >= 2) filledTint else emptyTint,
+                modifier = Modifier.size(iconSize)
+            )
+
+            // Нижняя звезда (заполнена при приоритете 1, 2 и 3)
+            Icon(
+                imageVector = if (priority >= 1) Icons.Default.Star else Icons.Outlined.StarOutline,
+                contentDescription = null,
+                tint = if (priority >= 1) filledTint else emptyTint,
                 modifier = Modifier.size(iconSize)
             )
         }

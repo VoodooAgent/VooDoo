@@ -30,6 +30,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.voodoo.data.Task
@@ -40,27 +41,25 @@ import com.example.voodoo.presentation.components.TaskSwipeMenu
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun PriorityScreen(
+fun RoutineScreen(
     onBackClick: () -> Unit,
     onTaskClick: (Long) -> Unit,
     taskListViewModel: TaskListViewModel = viewModel(),
     mainViewModel: MainViewModel = viewModel()
 ) {
-    val priorityTasks by taskListViewModel.priorityTasks.collectAsState()
+    val routineTasks by taskListViewModel.routineTasks.collectAsState()
     val contexts by taskListViewModel.contexts.collectAsState()
     val settings by mainViewModel.settings.collectAsState()
     val durations by taskListViewModel.taskDurations.collectAsState()
 
     var showSwipeMenu by remember { mutableStateOf<Task?>(null) }
-    var showCreateDialog by remember { mutableStateOf(false) }
-    var createParent by remember { mutableStateOf<Task?>(null) }
 
-    // Фильтруем: только АКТИВНЫЕ приоритетные задачи (без R-приоритета, т.к. он уже отсеян в DAO)
-    val activePriorityTasks = remember(priorityTasks) {
-        priorityTasks.filter { !it.isDone }
+    // Только активные рутинные задачи
+    val activeRoutineTasks = remember(routineTasks) {
+        routineTasks.filter { !it.isDone }
     }
 
-    val tasksByContext = activePriorityTasks.groupBy { it.contextId }
+    val tasksByContext = activeRoutineTasks.groupBy { it.contextId }
     val allContextKeys = tasksByContext.keys
 
     var collapsedContexts by remember { mutableStateOf<Set<Long?>>(emptySet()) }
@@ -73,7 +72,13 @@ fun PriorityScreen(
                     Row(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text("Приоритетные задачи")
+                        Text(
+                            text = "R",
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("Рутина")
 
                         Spacer(modifier = Modifier.width(4.dp))
 
@@ -121,10 +126,10 @@ fun PriorityScreen(
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            if (activePriorityTasks.isEmpty()) {
-                item(key = "empty_priority") {
+            if (activeRoutineTasks.isEmpty()) {
+                item(key = "empty_routine") {
                     Text(
-                        text = "Нет активных приоритетных задач",
+                        text = "Нет активных рутинных задач",
                         style = MaterialTheme.typography.bodyLarge,
                         modifier = Modifier.padding(top = 16.dp)
                     )
@@ -138,8 +143,8 @@ fun PriorityScreen(
                     contexts.find { it.id == contextId }?.name ?: "Контекст $contextId"
                 }
 
-                item(key = contextId?.toString() ?: "no_context") {
-                    PriorityContextSection(
+                item(key = "routine_${contextId?.toString() ?: "no_context"}") {
+                    RoutineContextSection(
                         contextName = contextName,
                         tasks = tasks,
                         durations = durations,
@@ -164,12 +169,8 @@ fun PriorityScreen(
     showSwipeMenu?.let { task ->
         TaskSwipeMenu(
             onDismiss = { showSwipeMenu = null },
-            onAddSubtaskClick = {
-                createParent = task
-                showCreateDialog = true
-                showSwipeMenu = null
-            },
-            onICalClick = { /* TODO */ },
+            onAddSubtaskClick = { /* Рутинные задачи обычно не имеют подзадач, но можно разрешить */ },
+            onICalClick = { },
             onEditClick = { onTaskClick(task.id) },
             onDeleteClick = {
                 taskListViewModel.deleteTask(task)
@@ -182,27 +183,10 @@ fun PriorityScreen(
             }
         )
     }
-
-    if (showCreateDialog) {
-        CreateTaskDialog(
-            onDismiss = { showCreateDialog = false },
-            onCreate = { title: String ->
-                createParent?.let { parent ->
-                    taskListViewModel.createTask(
-                        title = title,
-                        contextId = parent.contextId,
-                        parentId = parent.id
-                    )
-                    taskListViewModel.expandTask(parent.id)
-                }
-                showCreateDialog = false
-            }
-        )
-    }
 }
 
 @Composable
-fun PriorityContextSection(
+fun RoutineContextSection(
     contextName: String,
     tasks: List<Task>,
     durations: Map<Long, Long>,
