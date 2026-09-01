@@ -1,6 +1,6 @@
 package com.example.voodoo.data
 
-import android.content.Context as AndroidContext
+import android.content.Context
 import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
@@ -15,7 +15,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         AppSettings::class,
         ICalSyncSetting::class
     ],
-    version = 5,
+    version = 6,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -63,7 +63,7 @@ abstract class AppDatabase : RoomDatabase() {
 
                 database.execSQL("""
                     INSERT INTO tasks_new (contextId, parentId, title, description, isDone, sortOrder, createdAt)
-                    SELECT 
+                    SELECT
                         p.contextId,
                         (SELECT t.id FROM tasks_new t WHERE t.title = p.name AND t.contextId = p.contextId LIMIT 1),
                         title,
@@ -93,6 +93,7 @@ abstract class AppDatabase : RoomDatabase() {
                         FOREIGN KEY(taskId) REFERENCES tasks(id) ON DELETE CASCADE
                     )
                 """)
+
                 database.execSQL("CREATE INDEX index_timer_sessions_taskId ON timer_sessions(taskId)")
 
                 database.execSQL("""
@@ -117,18 +118,26 @@ abstract class AppDatabase : RoomDatabase() {
                         FOREIGN KEY(contextId) REFERENCES contexts(id) ON DELETE CASCADE
                     )
                 """)
+
                 database.execSQL("CREATE INDEX index_ical_sync_settings_contextId ON ical_sync_settings(contextId)")
             }
         }
 
-        fun getDatabase(context: AndroidContext): AppDatabase {
+        // Миграция 5 → 6: добавление колонки comment в timer_sessions
+        private val MIGRATION_5_6 = object : Migration(5, 6) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                database.execSQL("ALTER TABLE timer_sessions ADD COLUMN comment TEXT NOT NULL DEFAULT ''")
+            }
+        }
+
+        fun getDatabase(context: Context): AppDatabase {
             return INSTANCE ?: synchronized(this) {
                 val instance = Room.databaseBuilder(
                     context.applicationContext,
                     AppDatabase::class.java,
                     "voodoo_database"
                 )
-                    .addMigrations(MIGRATION_4_5)
+                    .addMigrations(MIGRATION_4_5, MIGRATION_5_6)
                     .build()
                 INSTANCE = instance
                 instance

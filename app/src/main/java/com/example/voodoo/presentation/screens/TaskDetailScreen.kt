@@ -1,5 +1,6 @@
 package com.example.voodoo.presentation.screens
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -12,6 +13,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.voodoo.data.TimerSession
 import com.example.voodoo.presentation.MainViewModel
 import com.example.voodoo.presentation.TaskDetailViewModel
 import com.example.voodoo.presentation.TaskListViewModel
@@ -43,7 +45,6 @@ fun TaskDetailScreen(
     var plannedEnd by remember { mutableStateOf<Long?>(null) }
     var reminderMinutes by remember { mutableStateOf<Int?>(null) }
     var isInitialized by remember { mutableStateOf(false) }
-
     var showStartDatePicker by remember { mutableStateOf(false) }
     var showEndDatePicker by remember { mutableStateOf(false) }
     var showStartTimePicker by remember { mutableStateOf(false) }
@@ -52,6 +53,9 @@ fun TaskDetailScreen(
     var showParentDialog by remember { mutableStateOf(false) }
     var pendingStartDate by remember { mutableStateOf<Long?>(null) }
     var pendingEndDate by remember { mutableStateOf<Long?>(null) }
+
+    // Состояние для диалога сессии
+    var sessionDialogData by remember { mutableStateOf<SessionDialogData?>(null) }
 
     LaunchedEffect(task) {
         task?.let { t ->
@@ -160,7 +164,6 @@ fun TaskDetailScreen(
                     Column(modifier = Modifier.padding(16.dp)) {
                         Text("Принадлежность", style = MaterialTheme.typography.titleMedium)
                         Spacer(modifier = Modifier.height(12.dp))
-
                         Text("Контекст:", style = MaterialTheme.typography.labelMedium)
                         Spacer(modifier = Modifier.height(4.dp))
                         OutlinedButton(
@@ -174,9 +177,7 @@ fun TaskDetailScreen(
                                 modifier = Modifier.size(16.dp)
                             )
                         }
-
                         Spacer(modifier = Modifier.height(12.dp))
-
                         Text("Родительская задача:", style = MaterialTheme.typography.labelMedium)
                         Spacer(modifier = Modifier.height(4.dp))
                         OutlinedButton(
@@ -223,6 +224,7 @@ fun TaskDetailScreen(
                             Spacer(modifier = Modifier.width(8.dp))
                             Text(plannedEnd?.let { detailViewModel.formatDateTime(it) } ?: "Не задано")
                         }
+
                         if (plannedStart != null) {
                             Spacer(modifier = Modifier.height(16.dp))
                             Text(
@@ -263,8 +265,29 @@ fun TaskDetailScreen(
                 // Сессии таймера
                 Card(modifier = Modifier.fillMaxWidth()) {
                     Column(modifier = Modifier.padding(16.dp)) {
-                        Text("Сессии таймера", style = MaterialTheme.typography.titleMedium)
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text("Сессии таймера", style = MaterialTheme.typography.titleMedium)
+                            IconButton(
+                                onClick = {
+                                    // Открыть диалог создания новой сессии
+                                    sessionDialogData = SessionDialogData(
+                                        session = null,
+                                        taskId = currentTask.id,
+                                        startTime = System.currentTimeMillis() - 30 * 60 * 1000, // 30 мин назад
+                                        endTime = System.currentTimeMillis(),
+                                        comment = ""
+                                    )
+                                }
+                            ) {
+                                Icon(Icons.Default.Add, contentDescription = "Добавить сессию")
+                            }
+                        }
                         Spacer(modifier = Modifier.height(8.dp))
+
                         if (sessions.isEmpty()) {
                             Text(
                                 "Нет сессий",
@@ -274,14 +297,36 @@ fun TaskDetailScreen(
                         } else {
                             sessions.forEach { session ->
                                 Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clickable {
+                                            // Открыть диалог редактирования
+                                            sessionDialogData = SessionDialogData(
+                                                session = session,
+                                                taskId = session.taskId,
+                                                startTime = session.startTime,
+                                                endTime = session.endTime,
+                                                comment = session.comment
+                                            )
+                                        }
+                                        .padding(vertical = 4.dp),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    Text(
-                                        text = detailViewModel.formatDateTime(session.startTime),
-                                        style = MaterialTheme.typography.bodySmall,
-                                        modifier = Modifier.weight(1f)
-                                    )
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(
+                                            text = detailViewModel.formatDateTime(session.startTime),
+                                            style = MaterialTheme.typography.bodySmall
+                                        )
+                                        if (session.comment.isNotBlank()) {
+                                            Text(
+                                                text = session.comment,
+                                                style = MaterialTheme.typography.labelSmall,
+                                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                                                maxLines = 1
+                                            )
+                                        }
+                                    }
                                     Text(
                                         text = detailViewModel.formatDuration(session.duration),
                                         style = MaterialTheme.typography.bodySmall
@@ -309,6 +354,15 @@ fun TaskDetailScreen(
         ) {
             CircularProgressIndicator()
         }
+    }
+
+    // ============ ДИАЛОГ СЕССИИ ============
+    sessionDialogData?.let { data ->
+        SessionEditDialog(
+            data = data,
+            viewModel = detailViewModel,
+            onDismiss = { sessionDialogData = null }
+        )
     }
 
     // Диалог выбора контекста
@@ -408,6 +462,7 @@ fun TaskDetailScreen(
             DatePicker(state = datePickerState)
         }
     }
+
     // TimePicker начала
     if (showStartTimePicker) {
         val timePickerState = rememberTimePickerState(
@@ -433,6 +488,7 @@ fun TaskDetailScreen(
             text = { TimePicker(state = timePickerState) }
         )
     }
+
     // DatePicker конца
     if (showEndDatePicker) {
         val datePickerState = rememberDatePickerState(
@@ -456,6 +512,7 @@ fun TaskDetailScreen(
             DatePicker(state = datePickerState)
         }
     }
+
     // TimePicker конца
     if (showEndTimePicker) {
         val timePickerState = rememberTimePickerState(
@@ -477,6 +534,247 @@ fun TaskDetailScreen(
             },
             dismissButton = {
                 TextButton(onClick = { showEndTimePicker = false }) { Text("Отмена") }
+            },
+            text = { TimePicker(state = timePickerState) }
+        )
+    }
+}
+
+// ============ ДИАЛОГ РЕДАКТИРОВАНИЯ СЕССИИ ============
+
+private data class SessionDialogData(
+    val session: TimerSession?,
+    val taskId: Long,
+    val startTime: Long,
+    val endTime: Long,
+    val comment: String
+)
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun SessionEditDialog(
+    data: SessionDialogData,
+    viewModel: TaskDetailViewModel,
+    onDismiss: () -> Unit
+) {
+    var startTime by remember { mutableLongStateOf(data.startTime) }
+    var endTime by remember { mutableLongStateOf(data.endTime) }
+    var comment by remember { mutableStateOf(data.comment) }
+
+    var showStartDatePicker by remember { mutableStateOf(false) }
+    var showStartTimePicker by remember { mutableStateOf(false) }
+    var showEndDatePicker by remember { mutableStateOf(false) }
+    var showEndTimePicker by remember { mutableStateOf(false) }
+    var pendingDate by remember { mutableLongStateOf(0L) }
+    var pendingTarget by remember { mutableStateOf("") } // "start" или "end"
+
+    val isNewSession = data.session == null
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(if (isNewSession) "Новая сессия" else "Редактирование сессии") },
+        text = {
+            Column(
+                modifier = Modifier.verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                // Комментарий
+                OutlinedTextField(
+                    value = comment,
+                    onValueChange = { comment = it },
+                    label = { Text("Комментарий") },
+                    modifier = Modifier.fillMaxWidth(),
+                    minLines = 2,
+                    placeholder = { Text("Заметки к сессии...") }
+                )
+
+                HorizontalDivider()
+
+                // Начало сессии
+                Text("Начало сессии:", style = MaterialTheme.typography.labelLarge)
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    OutlinedButton(
+                        onClick = {
+                            pendingTarget = "start"
+                            showStartDatePicker = true
+                        },
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Icon(Icons.Default.CalendarMonth, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(viewModel.formatDate(startTime), maxLines = 1)
+                    }
+                    OutlinedButton(
+                        onClick = {
+                            pendingTarget = "start"
+                            showStartTimePicker = true
+                        },
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Icon(Icons.Default.Schedule, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(viewModel.formatTime(startTime), maxLines = 1)
+                    }
+                }
+
+                // Конец сессии
+                Text("Конец сессии:", style = MaterialTheme.typography.labelLarge)
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    OutlinedButton(
+                        onClick = {
+                            pendingTarget = "end"
+                            showEndDatePicker = true
+                        },
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Icon(Icons.Default.CalendarMonth, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(viewModel.formatDate(endTime), maxLines = 1)
+                    }
+                    OutlinedButton(
+                        onClick = {
+                            pendingTarget = "end"
+                            showEndTimePicker = true
+                        },
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Icon(Icons.Default.Schedule, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(viewModel.formatTime(endTime), maxLines = 1)
+                    }
+                }
+
+                // Длительность
+                if (endTime > startTime) {
+                    val duration = endTime - startTime
+                    Text(
+                        "Длительность: ${viewModel.formatDuration(duration)}",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                if (!isNewSession) {
+                    TextButton(
+                        onClick = {
+                            data.session?.let { viewModel.deleteSession(it) }
+                            onDismiss()
+                        }
+                    ) {
+                        Text("Удалить", color = MaterialTheme.colorScheme.error)
+                    }
+                }
+                TextButton(onClick = onDismiss) { Text("Отмена") }
+                TextButton(
+                    onClick = {
+                        if (endTime > startTime) {
+                            if (isNewSession) {
+                                viewModel.addSession(data.taskId, startTime, endTime, comment.trim())
+                            } else {
+                                data.session?.let {
+                                    viewModel.updateSession(it, startTime, endTime, comment.trim())
+                                }
+                            }
+                            onDismiss()
+                        }
+                    },
+                    enabled = endTime > startTime
+                ) {
+                    Text(if (isNewSession) "Создать" else "Сохранить")
+                }
+            }
+        }
+    )
+
+    // DatePicker для сессии
+    if (showStartDatePicker || showEndDatePicker) {
+        val isStart = showStartDatePicker
+        val initialMillis = if (isStart) startTime else endTime
+        val datePickerState = rememberDatePickerState(
+            initialSelectedDateMillis = initialMillis
+        )
+        DatePickerDialog(
+            onDismissRequest = {
+                showStartDatePicker = false
+                showEndDatePicker = false
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    datePickerState.selectedDateMillis?.let { date ->
+                        pendingDate = date
+                        if (isStart) {
+                            showStartDatePicker = false
+                            showStartTimePicker = true
+                        } else {
+                            showEndDatePicker = false
+                            showEndTimePicker = true
+                        }
+                    }
+                }) { Text("OK") }
+            },
+            dismissButton = {
+                TextButton(onClick = {
+                    showStartDatePicker = false
+                    showEndDatePicker = false
+                }) { Text("Отмена") }
+            }
+        ) {
+            DatePicker(state = datePickerState)
+        }
+    }
+
+    // TimePicker для сессии
+    if (showStartTimePicker || showEndTimePicker) {
+        val isStart = showStartTimePicker
+        val initialMillis = if (isStart) startTime else endTime
+        val cal = Calendar.getInstance().apply { timeInMillis = initialMillis }
+        val timePickerState = rememberTimePickerState(
+            initialHour = cal.get(Calendar.HOUR_OF_DAY),
+            initialMinute = cal.get(Calendar.MINUTE)
+        )
+        AlertDialog(
+            onDismissRequest = {
+                showStartTimePicker = false
+                showEndTimePicker = false
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    // Объединяем дату из pendingDate (если была) с выбранным временем
+                    val baseDate = if (pendingDate != 0L) pendingDate else initialMillis
+                    val newCal = Calendar.getInstance().apply {
+                        this.timeInMillis = baseDate
+                        set(Calendar.HOUR_OF_DAY, timePickerState.hour)
+                        set(Calendar.MINUTE, timePickerState.minute)
+                        set(Calendar.SECOND, 0)
+                        set(Calendar.MILLISECOND, 0)
+                    }
+                    val newMillis = newCal.timeInMillis
+                    if (pendingTarget == "start") {
+                        startTime = newMillis
+                    } else {
+                        endTime = newMillis
+                    }
+                    pendingDate = 0L
+                    showStartTimePicker = false
+                    showEndTimePicker = false
+                }) { Text("OK") }
+            },
+            dismissButton = {
+                TextButton(onClick = {
+                    showStartTimePicker = false
+                    showEndTimePicker = false
+                }) { Text("Отмена") }
             },
             text = { TimePicker(state = timePickerState) }
         )

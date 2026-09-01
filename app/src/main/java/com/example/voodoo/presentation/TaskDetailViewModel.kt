@@ -17,6 +17,7 @@ import java.text.SimpleDateFormat
 import java.util.*
 
 class TaskDetailViewModel(application: Application) : AndroidViewModel(application) {
+
     private val database = AppDatabase.getDatabase(application)
     private val taskDao = database.taskDao()
     private val sessionDao = database.timerSessionDao()
@@ -72,7 +73,49 @@ class TaskDetailViewModel(application: Application) : AndroidViewModel(applicati
         }
     }
 
+    // ============ СЕССИИ ТАЙМЕРА ============
+
+    fun addSession(taskId: Long, startTime: Long, endTime: Long, comment: String) {
+        viewModelScope.launch {
+            val duration = (endTime - startTime).coerceAtLeast(0L)
+            val session = TimerSession(
+                taskId = taskId,
+                startTime = startTime,
+                endTime = endTime,
+                duration = duration,
+                comment = comment
+            )
+            withContext(Dispatchers.IO) {
+                sessionDao.insert(session)
+            }
+        }
+    }
+
+    fun updateSession(session: TimerSession, startTime: Long, endTime: Long, comment: String) {
+        viewModelScope.launch {
+            val duration = (endTime - startTime).coerceAtLeast(0L)
+            val updated = session.copy(
+                startTime = startTime,
+                endTime = endTime,
+                duration = duration,
+                comment = comment
+            )
+            withContext(Dispatchers.IO) {
+                sessionDao.update(updated)
+            }
+        }
+    }
+
+    fun deleteSession(session: TimerSession) {
+        viewModelScope.launch {
+            withContext(Dispatchers.IO) {
+                sessionDao.delete(session)
+            }
+        }
+    }
+
     // ============ СМЕНА КОНТЕКСТА ============
+
     fun updateContext(newContextId: Long?) {
         viewModelScope.launch {
             val current = _task.value ?: return@launch
@@ -88,6 +131,7 @@ class TaskDetailViewModel(application: Application) : AndroidViewModel(applicati
     }
 
     // ============ СМЕНА РОДИТЕЛЯ ============
+
     fun updateParent(newParentId: Long?) {
         viewModelScope.launch {
             val current = _task.value ?: return@launch
@@ -98,15 +142,20 @@ class TaskDetailViewModel(application: Application) : AndroidViewModel(applicati
                     return@withContext
                 }
                 if (newParentId == current.id) return@withContext
+
                 val all = taskDao.getAllTasks().first()
                 val descendants = collectDescendants(current.id, all)
+
                 // Защита от зацикливания: родитель не может быть потомком
                 if (descendants.contains(newParentId)) return@withContext
+
                 val parent = all.find { it.id == newParentId } ?: return@withContext
+
                 // Проверка лимита 7 уровней с учётом глубины своего поддерева
                 val depth = subtreeDepth(current.id, all)
                 val newLevel = parent.level + 1
                 if (newLevel + depth > 6) return@withContext
+
                 taskDao.updateParent(current.id, newParentId, newLevel)
                 relevelDescendants(current.id)
             }
@@ -114,6 +163,7 @@ class TaskDetailViewModel(application: Application) : AndroidViewModel(applicati
     }
 
     // ============ ДОПУСТИМЫЕ РОДИТЕЛИ ДЛЯ ДИАЛОГА ============
+
     fun eligibleParents(taskId: Long, all: List<Task>): List<Task> {
         val desc = collectDescendants(taskId, all).toSet()
         val depth = subtreeDepth(taskId, all)
@@ -123,6 +173,7 @@ class TaskDetailViewModel(application: Application) : AndroidViewModel(applicati
     }
 
     // ============ ВСПОМОГАТЕЛЬНЫЕ ============
+
     private fun collectDescendants(rootId: Long, all: List<Task>): List<Long> {
         val byParent = all.groupBy { it.parentId }
         val result = mutableListOf<Long>()
@@ -151,6 +202,7 @@ class TaskDetailViewModel(application: Application) : AndroidViewModel(applicati
         val all = taskDao.getAllTasks().first()
         val byParent = all.groupBy { it.parentId }
         val root = all.find { it.id == rootId } ?: return
+
         val queue = ArrayDeque<Pair<Task, Int>>()
         queue.addLast(root to root.level)
         while (queue.isNotEmpty()) {
@@ -167,6 +219,18 @@ class TaskDetailViewModel(application: Application) : AndroidViewModel(applicati
     fun formatDateTime(timestamp: Long?): String {
         if (timestamp == null) return ""
         val sdf = SimpleDateFormat("dd.MM.yyyy HH:mm", Locale.getDefault())
+        return sdf.format(Date(timestamp))
+    }
+
+    fun formatDate(timestamp: Long?): String {
+        if (timestamp == null) return ""
+        val sdf = SimpleDateFormat("dd.MM.yyyy", Locale.getDefault())
+        return sdf.format(Date(timestamp))
+    }
+
+    fun formatTime(timestamp: Long?): String {
+        if (timestamp == null) return ""
+        val sdf = SimpleDateFormat("HH:mm", Locale.getDefault())
         return sdf.format(Date(timestamp))
     }
 

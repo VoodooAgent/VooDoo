@@ -46,14 +46,11 @@ data class Task(
     val isDone: Boolean = false,
     val priority: Int = 0,
     val sortOrder: Int = 0,
-
     val plannedStart: Long? = null,
     val plannedEnd: Long? = null,
     val reminderMinutesBefore: Int? = null,
-
     val createdAt: Long = System.currentTimeMillis(),
     val completedAt: Long? = null,
-
     val timerActive: Boolean = false,
     val timerStartedAt: Long? = null
 )
@@ -76,7 +73,8 @@ data class TimerSession(
     val taskId: Long,
     val startTime: Long,
     val endTime: Long,
-    val duration: Long
+    val duration: Long,
+    val comment: String = ""
 )
 
 @Entity(tableName = "app_settings")
