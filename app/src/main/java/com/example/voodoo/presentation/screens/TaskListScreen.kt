@@ -118,6 +118,7 @@ fun TaskListScreen(
     onTaskClick: (Long) -> Unit,
     onPriorityClick: () -> Unit,
     onRoutineClick: () -> Unit,
+    onActiveTimerClick: () -> Unit,
     taskListViewModel: TaskListViewModel = viewModel(),
     mainViewModel: MainViewModel = viewModel()
 ) {
@@ -221,6 +222,15 @@ fun TaskListScreen(
                     }
                 },
                 actions = {
+                    // Кнопка "A" для активных таймеров — перед кнопкой "R"
+                    IconButton(onClick = onActiveTimerClick) {
+                        Text(
+                            text = "A",
+                            color = barContentColor,
+                            fontWeight = FontWeight.Bold,
+                            style = MaterialTheme.typography.titleMedium
+                        )
+                    }
                     // Кнопка "R" для рутины — перед кнопкой "!"
                     IconButton(onClick = onRoutineClick) {
                         Text(

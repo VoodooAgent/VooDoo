@@ -114,7 +114,8 @@ fun VooDooNavHost(viewModel: MainViewModel) {
                 onBackClick = { navController.popBackStack() },
                 onTaskClick = { taskId -> navController.navigate("task/$taskId") },
                 onPriorityClick = { navController.navigate("priority") },
-                onRoutineClick = { navController.navigate("routine") }
+                onRoutineClick = { navController.navigate("routine") },
+                onActiveTimerClick = { navController.navigate("active_timer") }
             )
         }
         composable("context_no") {
@@ -124,7 +125,8 @@ fun VooDooNavHost(viewModel: MainViewModel) {
                 onBackClick = { navController.popBackStack() },
                 onTaskClick = { taskId -> navController.navigate("task/$taskId") },
                 onPriorityClick = { navController.navigate("priority") },
-                onRoutineClick = { navController.navigate("routine") }
+                onRoutineClick = { navController.navigate("routine") },
+                onActiveTimerClick = { navController.navigate("active_timer") }
             )
         }
         composable("settings") {
@@ -166,6 +168,12 @@ fun VooDooNavHost(viewModel: MainViewModel) {
         }
         composable("routine") {
             RoutineScreen(
+                onBackClick = { navController.popBackStack() },
+                onTaskClick = { taskId -> navController.navigate("task/$taskId") }
+            )
+        }
+        composable("active_timer") {
+            ActiveTimerScreen(
                 onBackClick = { navController.popBackStack() },
                 onTaskClick = { taskId -> navController.navigate("task/$taskId") }
             )

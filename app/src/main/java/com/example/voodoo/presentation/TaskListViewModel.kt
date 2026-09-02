@@ -57,6 +57,10 @@ class TaskListViewModel(application: Application) : AndroidViewModel(application
     val routineTasks: StateFlow<List<Task>> = taskDao.getRoutineTasks()
         .stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
 
+    // Активные задачи (с запущенным таймером)
+    val activeTimerTasks: StateFlow<List<Task>> = taskDao.getActiveTimerTasksFlow()
+        .stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
+
     fun selectContext(contextId: Long?) {
         _selectedContextId.value = contextId
     }

@@ -55,8 +55,12 @@ interface TaskDao {
     @Query("SELECT * FROM tasks WHERE priority = 4 ORDER BY contextId ASC, sortOrder ASC")
     fun getRoutineTasks(): Flow<List<Task>>
 
+    // Задачи с запущенным таймером (Active Timer Tasks)
     @Query("SELECT * FROM tasks WHERE timerActive = 1")
     suspend fun getActiveTimerTasks(): List<Task>
+
+    @Query("SELECT * FROM tasks WHERE timerActive = 1")
+    fun getActiveTimerTasksFlow(): Flow<List<Task>>
 
     @Query("SELECT * FROM tasks WHERE plannedStart IS NOT NULL AND plannedEnd IS NOT NULL")
     suspend fun getPlannedTasks(): List<Task>
