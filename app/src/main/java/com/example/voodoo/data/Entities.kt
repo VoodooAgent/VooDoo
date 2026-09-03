@@ -83,7 +83,9 @@ data class AppSettings(
     val id: Int = 1,
     val darkTheme: Boolean = true,
     val fontSize: Int = 16,
-    val noContextName: String = "Без контекста"
+    val noContextName: String = "Без контекста",
+    val showTasks: Boolean = true,
+    val showSessions: Boolean = true
 )
 
 @Entity(
@@ -99,6 +101,25 @@ data class AppSettings(
     indices = [Index(value = ["contextId"])]
 )
 data class ICalSyncSetting(
+    @PrimaryKey(autoGenerate = true)
+    val id: Long = 0,
+    val contextId: Long,
+    val enabled: Boolean = true
+)
+
+@Entity(
+    tableName = "calendar_context_settings",
+    foreignKeys = [
+        ForeignKey(
+            entity = ProjectContext::class,
+            parentColumns = ["id"],
+            childColumns = ["contextId"],
+            onDelete = ForeignKey.CASCADE
+        )
+    ],
+    indices = [Index(value = ["contextId"])]
+)
+data class CalendarContextSetting(
     @PrimaryKey(autoGenerate = true)
     val id: Long = 0,
     val contextId: Long,

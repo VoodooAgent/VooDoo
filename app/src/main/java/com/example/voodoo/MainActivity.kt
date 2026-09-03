@@ -53,7 +53,6 @@ fun VooDooNavHost(viewModel: MainViewModel) {
     val importResult by viewModel.importResult.collectAsState()
     val context = LocalContext.current
 
-    // Лаунчер для экспорта CSV
     val exportLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.CreateDocument("text/csv")
     ) { uri ->
@@ -62,7 +61,6 @@ fun VooDooNavHost(viewModel: MainViewModel) {
         }
     }
 
-    // Лаунчер для импорта CSV
     val importLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocument()
     ) { uri ->
@@ -71,7 +69,6 @@ fun VooDooNavHost(viewModel: MainViewModel) {
         }
     }
 
-    // Обработка результата экспорта
     LaunchedEffect(exportResult) {
         exportResult?.let { message ->
             Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
@@ -79,7 +76,6 @@ fun VooDooNavHost(viewModel: MainViewModel) {
         }
     }
 
-    // Обработка результата импорта
     LaunchedEffect(importResult) {
         importResult?.let { message ->
             Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
@@ -115,7 +111,8 @@ fun VooDooNavHost(viewModel: MainViewModel) {
                 onTaskClick = { taskId -> navController.navigate("task/$taskId") },
                 onPriorityClick = { navController.navigate("priority") },
                 onRoutineClick = { navController.navigate("routine") },
-                onActiveTimerClick = { navController.navigate("active_timer") }
+                onActiveTimerClick = { navController.navigate("active_timer") },
+                onCalendarClick = { navController.navigate("calendar") }
             )
         }
         composable("context_no") {
@@ -126,7 +123,8 @@ fun VooDooNavHost(viewModel: MainViewModel) {
                 onTaskClick = { taskId -> navController.navigate("task/$taskId") },
                 onPriorityClick = { navController.navigate("priority") },
                 onRoutineClick = { navController.navigate("routine") },
-                onActiveTimerClick = { navController.navigate("active_timer") }
+                onActiveTimerClick = { navController.navigate("active_timer") },
+                onCalendarClick = { navController.navigate("calendar") }
             )
         }
         composable("settings") {
@@ -180,6 +178,18 @@ fun VooDooNavHost(viewModel: MainViewModel) {
         }
         composable("ical_sync") {
             ICalSyncScreen(onBackClick = { navController.popBackStack() })
+        }
+        composable("calendar") {
+            CalendarScreen(
+                onBackClick = { navController.popBackStack() },
+                onTaskClick = { taskId -> navController.navigate("task/$taskId") },
+                onSettingsClick = { navController.navigate("calendar_settings") }
+            )
+        }
+        composable("calendar_settings") {
+            CalendarSettingsScreen(
+                onBackClick = { navController.popBackStack() }
+            )
         }
     }
 }

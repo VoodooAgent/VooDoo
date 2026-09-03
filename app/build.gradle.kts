@@ -12,7 +12,7 @@ android {
 
     defaultConfig {
         applicationId = "com.example.voodoo"
-        minSdk = 26                    // ← ИЗМЕНЕНО с 24 на 26 (для Groovy)
+        minSdk = 26
         targetSdk = 35
         versionCode = 2
         versionName = "2.0"
@@ -85,6 +85,10 @@ dependencies {
 
     // Reorderable
     implementation("sh.calvin.reorderable:reorderable:2.1.1")
+
+    // --- ДОБАВЛЕНО: Календарь и работа с датами ---
+    implementation("com.kizitonwose.calendar:compose:2.6.0")
+    implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.6.1")
 
     // Testing
     testImplementation("junit:junit:4.13.2")

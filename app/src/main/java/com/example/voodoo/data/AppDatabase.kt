@@ -13,9 +13,10 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         Task::class,
         TimerSession::class,
         AppSettings::class,
-        ICalSyncSetting::class
+        ICalSyncSetting::class,
+        CalendarContextSetting::class
     ],
-    version = 6,
+    version = 7,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -24,6 +25,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun timerSessionDao(): TimerSessionDao
     abstract fun settingsDao(): SettingsDao
     abstract fun icalSyncDao(): ICalSyncDao
+    abstract fun calendarContextDao(): CalendarContextDao
 
     companion object {
         @Volatile
@@ -123,10 +125,31 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
-        // Миграция 5 → 6: добавление колонки comment в timer_sessions
         private val MIGRATION_5_6 = object : Migration(5, 6) {
             override fun migrate(database: SupportSQLiteDatabase) {
                 database.execSQL("ALTER TABLE timer_sessions ADD COLUMN comment TEXT NOT NULL DEFAULT ''")
+            }
+        }
+
+        private val MIGRATION_6_7 = object : Migration(6, 7) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                database.execSQL("""
+                    CREATE TABLE calendar_context_settings (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        contextId INTEGER NOT NULL,
+                        enabled INTEGER NOT NULL DEFAULT 1,
+                        FOREIGN KEY(contextId) REFERENCES contexts(id) ON DELETE CASCADE
+                    )
+                """)
+                database.execSQL("CREATE INDEX index_calendar_context_settings_contextId ON calendar_context_settings(contextId)")
+
+                database.execSQL("""
+                    INSERT INTO calendar_context_settings (contextId, enabled)
+                    SELECT id, 1 FROM contexts
+                """)
+
+                database.execSQL("ALTER TABLE app_settings ADD COLUMN showTasks INTEGER NOT NULL DEFAULT 1")
+                database.execSQL("ALTER TABLE app_settings ADD COLUMN showSessions INTEGER NOT NULL DEFAULT 1")
             }
         }
 
@@ -137,7 +160,7 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "voodoo_database"
                 )
-                    .addMigrations(MIGRATION_4_5, MIGRATION_5_6)
+                    .addMigrations(MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7)
                     .build()
                 INSTANCE = instance
                 instance

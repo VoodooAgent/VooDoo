@@ -119,6 +119,7 @@ fun TaskListScreen(
     onPriorityClick: () -> Unit,
     onRoutineClick: () -> Unit,
     onActiveTimerClick: () -> Unit,
+    onCalendarClick: () -> Unit,
     taskListViewModel: TaskListViewModel = viewModel(),
     mainViewModel: MainViewModel = viewModel()
 ) {
@@ -222,6 +223,15 @@ fun TaskListScreen(
                     }
                 },
                 actions = {
+                    // Новая кнопка K для Календаря
+                    IconButton(onClick = onCalendarClick) {
+                        Text(
+                            text = "K",
+                            color = barContentColor,
+                            fontWeight = FontWeight.Bold,
+                            style = MaterialTheme.typography.titleMedium
+                        )
+                    }
                     // Кнопка "A" для активных таймеров — перед кнопкой "R"
                     IconButton(onClick = onActiveTimerClick) {
                         Text(

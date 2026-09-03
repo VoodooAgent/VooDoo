@@ -47,15 +47,12 @@ interface TaskDao {
     @Query("SELECT * FROM tasks WHERE id = :taskId")
     fun getTaskById(taskId: Long): Flow<Task?>
 
-    // Приоритетные задачи: только 1-3 звезды (без рутины)
     @Query("SELECT * FROM tasks WHERE priority > 0 AND priority < 4 ORDER BY priority DESC, sortOrder ASC")
     fun getPriorityTasks(): Flow<List<Task>>
 
-    // Рутинные задачи: только приоритет R (4)
     @Query("SELECT * FROM tasks WHERE priority = 4 ORDER BY contextId ASC, sortOrder ASC")
     fun getRoutineTasks(): Flow<List<Task>>
 
-    // Задачи с запущенным таймером (Active Timer Tasks)
     @Query("SELECT * FROM tasks WHERE timerActive = 1")
     suspend fun getActiveTimerTasks(): List<Task>
 
@@ -151,4 +148,19 @@ interface ICalSyncDao {
 
     @Delete
     suspend fun delete(setting: ICalSyncSetting)
+}
+
+@Dao
+interface CalendarContextDao {
+    @Query("SELECT * FROM calendar_context_settings")
+    fun getAllSettings(): Flow<List<CalendarContextSetting>>
+
+    @Query("SELECT contextId FROM calendar_context_settings WHERE enabled = 1")
+    suspend fun getEnabledContextIds(): List<Long>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsert(setting: CalendarContextSetting)
+
+    @Delete
+    suspend fun delete(setting: CalendarContextSetting)
 }
