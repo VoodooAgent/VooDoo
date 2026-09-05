@@ -2,7 +2,9 @@ package com.example.voodoo.service
 
 import android.content.Context
 import android.net.Uri
+import androidx.room.withTransaction
 import com.example.voodoo.data.AppDatabase
+import com.example.voodoo.data.CalendarContextSetting
 import com.example.voodoo.data.ProjectContext
 import com.example.voodoo.data.Task
 import com.example.voodoo.data.TimerSession
@@ -29,7 +31,6 @@ object CSVManager {
 
                         csvWriter.writeNext(arrayOf("CONTEXTS"))
                         csvWriter.writeNext(arrayOf("id", "name", "color", "sortOrder", "createdAt"))
-
                         val contexts = contextDao.getAllContexts().first()
                         contexts.forEach { ctx ->
                             csvWriter.writeNext(arrayOf(
@@ -48,7 +49,6 @@ object CSVManager {
                             "result", "isDone", "priority", "sortOrder", "plannedStart",
                             "plannedEnd", "reminderMinutesBefore", "createdAt", "completedAt"
                         ))
-
                         val tasks = taskDao.getAllTasks().first()
                         tasks.forEach { task ->
                             csvWriter.writeNext(arrayOf(
@@ -72,8 +72,7 @@ object CSVManager {
 
                         csvWriter.writeNext(arrayOf(""))
                         csvWriter.writeNext(arrayOf("TIMER_SESSIONS"))
-                        csvWriter.writeNext(arrayOf("id", "taskId", "startTime", "endTime", "duration"))
-
+                        csvWriter.writeNext(arrayOf("id", "taskId", "startTime", "endTime", "duration", "comment"))
                         tasks.forEach { task ->
                             val sessions = sessionDao.getSessionsByTaskSync(task.id)
                             sessions.forEach { session ->
@@ -82,7 +81,8 @@ object CSVManager {
                                     session.taskId.toString(),
                                     session.startTime.toString(),
                                     session.endTime.toString(),
-                                    session.duration.toString()
+                                    session.duration.toString(),
+                                    session.comment
                                 ))
                             }
                         }
@@ -90,6 +90,7 @@ object CSVManager {
                         csvWriter.close()
                     }
                 }
+
                 true
             } catch (e: Exception) {
                 e.printStackTrace()
@@ -102,14 +103,16 @@ object CSVManager {
         return withContext(Dispatchers.IO) {
             try {
                 val db = AppDatabase.getDatabase(context)
-                val contextDao = db.contextDao()
-                val taskDao = db.taskDao()
-                val sessionDao = db.timerSessionDao()
+
+                val contexts = mutableListOf<ProjectContext>()
+                val tasks = mutableListOf<Task>()
+                val sessions = mutableListOf<TimerSession>()
+
+                var currentSection = ""
 
                 context.contentResolver.openInputStream(uri)?.use { inputStream ->
                     InputStreamReader(inputStream).use { reader ->
                         val csvReader = CSVReader(reader)
-                        var currentSection = ""
 
                         csvReader.forEach { line ->
                             when {
@@ -128,14 +131,14 @@ object CSVManager {
                                 }
                                 line[0] == "id" -> return@forEach
                                 line[0].matches(Regex("\\d+")) && currentSection == "contexts" -> {
-                                    val context = ProjectContext(
+                                    val ctx = ProjectContext(
                                         id = line[0].toLong(),
                                         name = line[1],
                                         color = line[2].toLong(),
                                         sortOrder = line[3].toInt(),
                                         createdAt = line[4].toLong()
                                     )
-                                    contextDao.insert(context)
+                                    contexts.add(ctx)
                                 }
                                 line[0].matches(Regex("\\d+")) && currentSection == "tasks" -> {
                                     val task = Task(
@@ -155,7 +158,7 @@ object CSVManager {
                                         createdAt = line[13].toLong(),
                                         completedAt = line[14].takeIf { it.isNotBlank() }?.toLong()
                                     )
-                                    taskDao.insert(task)
+                                    tasks.add(task)
                                 }
                                 line[0].matches(Regex("\\d+")) && currentSection == "sessions" -> {
                                     val session = TimerSession(
@@ -163,16 +166,58 @@ object CSVManager {
                                         taskId = line[1].toLong(),
                                         startTime = line[2].toLong(),
                                         endTime = line[3].toLong(),
-                                        duration = line[4].toLong()
+                                        duration = line[4].toLong(),
+                                        comment = if (line.size >= 6) line[5] else ""
                                     )
-                                    sessionDao.insert(session)
+                                    sessions.add(session)
                                 }
                             }
                         }
-
                         csvReader.close()
                     }
                 }
+
+                db.withTransaction {
+                    db.timerSessionDao().deleteAll()
+                    db.taskDao().deleteAll()
+                    db.calendarContextDao().deleteAll()
+                    db.contextDao().deleteAll()
+
+                    val contextIdMapping = mutableMapOf<Long, Long>()
+                    val taskIdMapping = mutableMapOf<Long, Long>()
+
+                    contexts.forEach { oldContext ->
+                        val newId = db.contextDao().insertWithId(oldContext)
+                        contextIdMapping[oldContext.id] = newId
+
+                        db.calendarContextDao().insert(CalendarContextSetting(
+                            contextId = newId,
+                            enabled = true
+                        ))
+                    }
+
+                    tasks.forEach { oldTask ->
+                        val newTask = oldTask.copy(
+                            contextId = oldTask.contextId?.let { contextIdMapping[it] },
+                            parentId = oldTask.parentId?.let { taskIdMapping[it] }
+                        )
+                        val newId = db.taskDao().insertWithId(newTask)
+                        taskIdMapping[oldTask.id] = newId
+                    }
+
+                    var sessionsImported = 0
+                    sessions.forEach { oldSession ->
+                        val newTaskId = taskIdMapping[oldSession.taskId]
+                        if (newTaskId != null) {
+                            val newSession = oldSession.copy(taskId = newTaskId)
+                            db.timerSessionDao().insertWithId(newSession)
+                            sessionsImported++
+                        }
+                    }
+
+                    android.util.Log.d("CSVManager", "Импортировано: ${contexts.size} контекстов, ${tasks.size} задач, $sessionsImported/${sessions.size} сессий")
+                }
+
                 true
             } catch (e: Exception) {
                 e.printStackTrace()

@@ -17,11 +17,20 @@ interface ProjectContextDao {
     @Insert
     suspend fun insert(context: ProjectContext): Long
 
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertWithId(context: ProjectContext): Long
+
+    @Insert
+    suspend fun insertAll(contexts: List<ProjectContext>)
+
     @Update
     suspend fun update(context: ProjectContext)
 
     @Delete
     suspend fun delete(context: ProjectContext)
+
+    @Query("DELETE FROM contexts")
+    suspend fun deleteAll()
 
     @Query("UPDATE contexts SET sortOrder = :sortOrder WHERE id = :contextId")
     suspend fun updateSortOrder(contextId: Long, sortOrder: Int)
@@ -65,11 +74,20 @@ interface TaskDao {
     @Insert
     suspend fun insert(task: Task): Long
 
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertWithId(task: Task): Long
+
+    @Insert
+    suspend fun insertAll(tasks: List<Task>)
+
     @Update
     suspend fun update(task: Task)
 
     @Delete
     suspend fun delete(task: Task)
+
+    @Query("DELETE FROM tasks")
+    suspend fun deleteAll()
 
     @Query("UPDATE tasks SET isDone = :isDone, completedAt = :completedAt WHERE id = :taskId")
     suspend fun updateTaskStatus(taskId: Long, isDone: Boolean, completedAt: Long?)
@@ -90,8 +108,8 @@ interface TaskDao {
     suspend fun updateTimerStatus(taskId: Long, active: Boolean, startedAt: Long?)
 
     @Query("""
-        UPDATE tasks
-        SET parentId = NULL, level = 0
+        UPDATE tasks 
+        SET parentId = NULL, level = 0 
         WHERE id IN (SELECT id FROM tasks WHERE parentId IN (
             SELECT id FROM tasks WHERE parentId = :parentId
         ))
@@ -116,6 +134,12 @@ interface TimerSessionDao {
     @Insert
     suspend fun insert(session: TimerSession): Long
 
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertWithId(session: TimerSession): Long
+
+    @Insert
+    suspend fun insertAll(sessions: List<TimerSession>)
+
     @Update
     suspend fun update(session: TimerSession)
 
@@ -124,6 +148,9 @@ interface TimerSessionDao {
 
     @Query("DELETE FROM timer_sessions WHERE taskId = :taskId")
     suspend fun deleteSessionsByTask(taskId: Long)
+
+    @Query("DELETE FROM timer_sessions")
+    suspend fun deleteAll()
 }
 
 @Dao
@@ -148,6 +175,9 @@ interface ICalSyncDao {
 
     @Delete
     suspend fun delete(setting: ICalSyncSetting)
+
+    @Query("DELETE FROM ical_sync_settings")
+    suspend fun deleteAll()
 }
 
 @Dao
@@ -161,6 +191,15 @@ interface CalendarContextDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsert(setting: CalendarContextSetting)
 
+    @Insert
+    suspend fun insert(setting: CalendarContextSetting): Long
+
     @Delete
     suspend fun delete(setting: CalendarContextSetting)
+
+    @Query("DELETE FROM calendar_context_settings")
+    suspend fun deleteAll()
+
+    @Query("DELETE FROM calendar_context_settings WHERE contextId = :contextId")
+    suspend fun deleteByContextId(contextId: Long)
 }

@@ -5,10 +5,13 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.DeleteForever
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.TextUnitType
 import androidx.compose.ui.unit.dp
@@ -26,8 +29,21 @@ fun SettingsScreen(
     viewModel: MainViewModel = viewModel()
 ) {
     val settings by viewModel.settings.collectAsState()
+    val deleteResult by viewModel.deleteResult.collectAsState()
+
+    var showDeleteAllDialog by remember { mutableStateOf(false) }
+    val snackbarHostState = remember { SnackbarHostState() }
+
+    // Обработка результата удаления
+    LaunchedEffect(deleteResult) {
+        deleteResult?.let { message ->
+            snackbarHostState.showSnackbar(message)
+            viewModel.clearDeleteResult()
+        }
+    }
 
     Scaffold(
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             TopAppBar(
                 title = { Text("Настройки") },
@@ -47,6 +63,7 @@ fun SettingsScreen(
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
+
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 onClick = onContextsClick
@@ -141,6 +158,82 @@ fun SettingsScreen(
                     }
                 }
             }
+
+            // Кнопка "Удалить ВСЁ"
+            Card(modifier = Modifier.fillMaxWidth()) {
+                Button(
+                    onClick = { showDeleteAllDialog = true },
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.error
+                    )
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.DeleteForever,
+                        contentDescription = null,
+                        modifier = Modifier.padding(end = 8.dp)
+                    )
+                    Text("Удалить ВСЁ", color = Color.White)
+                }
+            }
         }
     }
+
+    // Диалог подтверждения удаления
+    if (showDeleteAllDialog) {
+        DeleteAllConfirmDialog(
+            onConfirm = {
+                showDeleteAllDialog = false
+                viewModel.deleteAllData()
+            },
+            onDismiss = {
+                showDeleteAllDialog = false
+            }
+        )
+    }
+}
+
+@Composable
+fun DeleteAllConfirmDialog(
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Text(
+                text = "Удалить ВСЁ",
+                style = MaterialTheme.typography.headlineSmall,
+                color = MaterialTheme.colorScheme.error
+            )
+        },
+        text = {
+            Text(
+                text = "Вы уверены что хотите удалить все задачи и сессии из базы данных?\n\nЭто действие нельзя отменить!",
+                style = MaterialTheme.typography.bodyLarge
+            )
+        },
+        confirmButton = {
+            Button(
+                onClick = onConfirm,
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.error
+                )
+            ) {
+                Text("Да", color = Color.White)
+            }
+        },
+        dismissButton = {
+            OutlinedButton(onClick = onDismiss) {
+                Text("Отменить")
+            }
+        },
+        icon = {
+            Icon(
+                imageVector = Icons.Default.Warning,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.error
+            )
+        }
+    )
 }

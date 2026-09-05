@@ -4,13 +4,16 @@ import android.app.Application
 import android.net.Uri
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import androidx.room.withTransaction
 import com.example.voodoo.data.AppDatabase
 import com.example.voodoo.data.AppSettings
 import com.example.voodoo.data.CsvHelper
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 class MainViewModel(application: Application) : AndroidViewModel(application) {
 
@@ -29,6 +32,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     private val _importResult = MutableStateFlow<String?>(null)
     val importResult: StateFlow<String?> = _importResult.asStateFlow()
+
+    private val _deleteResult = MutableStateFlow<String?>(null)
+    val deleteResult: StateFlow<String?> = _deleteResult.asStateFlow()
 
     init {
         viewModelScope.launch {
@@ -79,11 +85,34 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    fun deleteAllData() {
+        viewModelScope.launch {
+            try {
+                withContext(Dispatchers.IO) {
+                    database.withTransaction {
+                        database.timerSessionDao().deleteAll()
+                        database.taskDao().deleteAll()
+                        database.calendarContextDao().deleteAll()
+                        database.icalSyncDao().deleteAll()
+                        database.contextDao().deleteAll()
+                    }
+                }
+                _deleteResult.value = "Все данные успешно удалены"
+            } catch (e: Exception) {
+                _deleteResult.value = "Ошибка удаления: ${e.message}"
+            }
+        }
+    }
+
     fun clearExportResult() {
         _exportResult.value = null
     }
 
     fun clearImportResult() {
         _importResult.value = null
+    }
+
+    fun clearDeleteResult() {
+        _deleteResult.value = null
     }
 }
