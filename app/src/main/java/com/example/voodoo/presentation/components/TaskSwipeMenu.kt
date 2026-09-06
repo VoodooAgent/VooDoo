@@ -8,9 +8,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -27,8 +25,6 @@ import androidx.compose.ui.window.Dialog
 fun TaskSwipeMenu(
     onDismiss: () -> Unit,
     onAddSubtaskClick: () -> Unit,
-    onICalClick: () -> Unit,
-    onEditClick: () -> Unit,
     onDeleteClick: () -> Unit,
     isDone: Boolean = false,
     onRestoreClick: (() -> Unit)? = null
@@ -64,24 +60,6 @@ fun TaskSwipeMenu(
                     Icon(Icons.Default.Add, contentDescription = null)
                     Spacer(modifier = Modifier.width(8.dp))
                     Text("Добавить подзадачу")
-                }
-
-                Button(
-                    onClick = onICalClick,
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Icon(Icons.Default.CalendarMonth, contentDescription = null)
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text("В iCalendar")
-                }
-
-                Button(
-                    onClick = onEditClick,
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Icon(Icons.Default.Edit, contentDescription = null)
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text("Редактировать")
                 }
 
                 Button(

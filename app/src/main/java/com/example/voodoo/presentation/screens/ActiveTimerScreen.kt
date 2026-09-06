@@ -165,8 +165,6 @@ fun ActiveTimerScreen(
         TaskSwipeMenu(
             onDismiss = { showSwipeMenu = null },
             onAddSubtaskClick = { /* Активные задачи обычно не имеют подзадач, но можно разрешить */ },
-            onICalClick = { },
-            onEditClick = { onTaskClick(task.id) },
             onDeleteClick = {
                 taskListViewModel.deleteTask(task)
                 showSwipeMenu = null

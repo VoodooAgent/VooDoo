@@ -4,6 +4,7 @@ import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.voodoo.data.AppDatabase
+import com.example.voodoo.data.CalendarContextSetting
 import com.example.voodoo.data.ProjectContext
 import com.example.voodoo.data.Task
 import kotlinx.coroutines.flow.*
@@ -13,6 +14,7 @@ class ContextListViewModel(application: Application) : AndroidViewModel(applicat
 
     private val database = AppDatabase.getDatabase(application)
     private val contextDao = database.contextDao()
+    private val calendarContextDao = database.calendarContextDao()
     private val taskDao = database.taskDao()
 
     val contexts: StateFlow<List<ProjectContext>> = contextDao.getAllContexts()
@@ -20,7 +22,14 @@ class ContextListViewModel(application: Application) : AndroidViewModel(applicat
 
     fun createContext(name: String, color: Long) {
         viewModelScope.launch {
-            contextDao.insert(ProjectContext(name = name, color = color))
+            // 1. Создаём контекст и получаем его новый ID
+            val newContextId = contextDao.insert(ProjectContext(name = name, color = color))
+
+            // 2. Автоматически создаём запись для календаря (включён по умолчанию)
+            calendarContextDao.insert(CalendarContextSetting(
+                contextId = newContextId,
+                enabled = true
+            ))
         }
     }
 
@@ -32,6 +41,10 @@ class ContextListViewModel(application: Application) : AndroidViewModel(applicat
 
     fun deleteContext(context: ProjectContext) {
         viewModelScope.launch {
+            // 1. Удаляем запись из настроек календаря
+            calendarContextDao.deleteByContextId(context.id)
+
+            // 2. Удаляем сам контекст
             contextDao.delete(context)
         }
     }

@@ -389,8 +389,6 @@ fun TaskListScreen(
                 showCreateDialog = true
                 showSwipeMenu = null
             },
-            onICalClick = { },
-            onEditClick = { onTaskClick(task.id) },
             onDeleteClick = {
                 taskListViewModel.deleteTask(task)
                 showSwipeMenu = null

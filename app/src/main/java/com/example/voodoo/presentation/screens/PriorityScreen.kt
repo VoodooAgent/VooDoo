@@ -37,6 +37,7 @@ import com.example.voodoo.presentation.MainViewModel
 import com.example.voodoo.presentation.TaskListViewModel
 import com.example.voodoo.presentation.components.TaskCard
 import com.example.voodoo.presentation.components.TaskSwipeMenu
+import com.example.voodoo.presentation.screens.CreateTaskDialog
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -169,8 +170,6 @@ fun PriorityScreen(
                 showCreateDialog = true
                 showSwipeMenu = null
             },
-            onICalClick = { /* TODO */ },
-            onEditClick = { onTaskClick(task.id) },
             onDeleteClick = {
                 taskListViewModel.deleteTask(task)
                 showSwipeMenu = null
