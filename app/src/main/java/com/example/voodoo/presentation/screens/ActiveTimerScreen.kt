@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.ExpandLess
@@ -54,7 +55,11 @@ fun ActiveTimerScreen(
 
     var showSwipeMenu by remember { mutableStateOf<Task?>(null) }
 
-    val tasksByContext = activeTimerTasks.groupBy { it.contextId }
+    val sortedActiveTasks = remember(activeTimerTasks) {
+        activeTimerTasks.sortedBy { it.activeSortOrder ?: it.sortOrder }
+    }
+
+    val tasksByContext = sortedActiveTasks.groupBy { it.contextId }
     val allContextKeys = tasksByContext.keys
 
     var collapsedContexts by remember { mutableStateOf<Set<Long?>>(emptySet()) }
@@ -64,64 +69,44 @@ fun ActiveTimerScreen(
         topBar = {
             TopAppBar(
                 title = {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
                         Text(
-                            text = "A",
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.primary
+                            text = "⏱️",
+                            style = MaterialTheme.typography.titleLarge
                         )
                         Spacer(modifier = Modifier.width(6.dp))
                         Text("Активные задачи")
 
-                        Spacer(modifier = Modifier.width(4.dp))
-
-                        IconButton(
-                            onClick = {
-                                collapsedContexts = if (allExpanded) {
-                                    allContextKeys
-                                } else {
-                                    emptySet()
-                                }
-                            },
-                            modifier = Modifier.size(36.dp)
-                        ) {
-                            Icon(
-                                imageVector = if (allExpanded) {
-                                    Icons.Default.ExpandLess
-                                } else {
-                                    Icons.Default.ExpandMore
+                        if (settings.groupSpecialContexts) {
+                            Spacer(modifier = Modifier.width(4.dp))
+                            IconButton(
+                                onClick = {
+                                    collapsedContexts = if (allExpanded) allContextKeys else emptySet()
                                 },
-                                contentDescription = if (allExpanded) {
-                                    "Свернуть все контексты"
-                                } else {
-                                    "Развернуть все контексты"
-                                },
-                                modifier = Modifier.size(28.dp)
-                            )
+                                modifier = Modifier.size(36.dp)
+                            ) {
+                                Icon(
+                                    imageVector = if (allExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                                    contentDescription = if (allExpanded) "Свернуть все контексты" else "Развернуть все контексты",
+                                    modifier = Modifier.size(28.dp)
+                                )
+                            }
                         }
                     }
                 },
                 navigationIcon = {
                     IconButton(onClick = onBackClick) {
-                        Icon(
-                            Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "Назад"
-                        )
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Назад")
                     }
                 }
             )
         }
     ) { padding ->
         LazyColumn(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding)
-                .padding(16.dp),
+            modifier = Modifier.fillMaxSize().padding(padding).padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            if (activeTimerTasks.isEmpty()) {
+            if (sortedActiveTasks.isEmpty()) {
                 item(key = "empty_active_timer") {
                     Text(
                         text = "Нет задач с запущенным таймером",
@@ -131,30 +116,49 @@ fun ActiveTimerScreen(
                 }
             }
 
-            tasksByContext.forEach { (contextId, tasks) ->
-                val contextName = if (contextId == null) {
-                    settings.noContextName
-                } else {
-                    contexts.find { it.id == contextId }?.name ?: "Контекст $contextId"
-                }
+            if (settings.groupSpecialContexts) {
+                tasksByContext.forEach { (contextId, tasks) ->
+                    val contextName = if (contextId == null) {
+                        settings.noContextName
+                    } else {
+                        contexts.find { it.id == contextId }?.name ?: "Контекст $contextId"
+                    }
 
-                item(key = "active_timer_${contextId?.toString() ?: "no_context"}") {
-                    ActiveTimerContextSection(
-                        contextName = contextName,
-                        tasks = tasks,
-                        durations = durations,
+                    item(key = "active_timer_${contextId?.toString() ?: "no_context"}") {
+                        ActiveTimerContextSection(
+                            contextName = contextName,
+                            tasks = tasks,
+                            durations = durations,
+                            fontSize = settings.fontSize,
+                            expanded = !collapsedContexts.contains(contextId),
+                            onToggleExpanded = {
+                                collapsedContexts = if (collapsedContexts.contains(contextId)) {
+                                    collapsedContexts - contextId
+                                } else {
+                                    collapsedContexts + contextId
+                                }
+                            },
+                            viewModel = taskListViewModel,
+                            onTaskClick = onTaskClick,
+                            onSwipeLeft = { task -> showSwipeMenu = task }
+                        )
+                    }
+                }
+            } else {
+                items(sortedActiveTasks, key = { "active_${it.id}" }) { task ->
+                    TaskCard(
+                        task = task,
+                        pastSessionsDuration = durations[task.id] ?: 0L,
                         fontSize = settings.fontSize,
-                        expanded = !collapsedContexts.contains(contextId),
-                        onToggleExpanded = {
-                            collapsedContexts = if (collapsedContexts.contains(contextId)) {
-                                collapsedContexts - contextId
-                            } else {
-                                collapsedContexts + contextId
-                            }
+                        onToggleDone = { taskListViewModel.requestComplete(task) },
+                        onCyclePriority = { taskListViewModel.cyclePriority(task) },
+                        onToggleTimer = {
+                            if (task.timerActive) taskListViewModel.pauseTimer(task)
+                            else taskListViewModel.startTimer(task)
                         },
-                        viewModel = taskListViewModel,
-                        onTaskClick = onTaskClick,
-                        onSwipeLeft = { task -> showSwipeMenu = task }
+                        onClick = { onTaskClick(task.id) },
+                        onSwipeRight = { taskListViewModel.requestComplete(task) },
+                        onSwipeLeft = { showSwipeMenu = task }
                     )
                 }
             }
@@ -164,7 +168,17 @@ fun ActiveTimerScreen(
     showSwipeMenu?.let { task ->
         TaskSwipeMenu(
             onDismiss = { showSwipeMenu = null },
-            onAddSubtaskClick = { /* Активные задачи обычно не имеют подзадач, но можно разрешить */ },
+            onAddSubtaskClick = { },
+            onICalClick = { },
+            onEditClick = { onTaskClick(task.id) },
+            onMoveUpClick = {
+                taskListViewModel.moveActiveTaskUp(task)
+                showSwipeMenu = null
+            },
+            onMoveDownClick = {
+                taskListViewModel.moveActiveTaskDown(task)
+                showSwipeMenu = null
+            },
             onDeleteClick = {
                 taskListViewModel.deleteTask(task)
                 showSwipeMenu = null
@@ -190,31 +204,20 @@ fun ActiveTimerContextSection(
     onTaskClick: (Long) -> Unit,
     onSwipeLeft: (Task) -> Unit
 ) {
-    Card(
-        modifier = Modifier.fillMaxWidth()
-    ) {
+    Card(modifier = Modifier.fillMaxWidth()) {
         Column {
             Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 8.dp, vertical = 2.dp),
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 2.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
                     text = contextName,
                     style = MaterialTheme.typography.titleMedium,
-                    modifier = Modifier
-                        .weight(1f)
-                        .padding(start = 8.dp)
+                    modifier = Modifier.weight(1f).padding(start = 8.dp)
                 )
-
                 IconButton(onClick = onToggleExpanded) {
                     Icon(
-                        imageVector = if (expanded) {
-                            Icons.Default.ExpandLess
-                        } else {
-                            Icons.Default.ExpandMore
-                        },
+                        imageVector = if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
                         contentDescription = if (expanded) "Свернуть" else "Развернуть"
                     )
                 }
@@ -222,10 +225,7 @@ fun ActiveTimerContextSection(
 
             if (expanded) {
                 Column(
-                    modifier = Modifier.padding(
-                        horizontal = 8.dp,
-                        vertical = 4.dp
-                    ),
+                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
                     verticalArrangement = Arrangement.spacedBy(2.dp)
                 ) {
                     tasks.forEach { task ->
@@ -233,17 +233,14 @@ fun ActiveTimerContextSection(
                             task = task,
                             pastSessionsDuration = durations[task.id] ?: 0L,
                             fontSize = fontSize,
-                            onToggleDone = { viewModel.toggleTaskDone(task) },
+                            onToggleDone = { viewModel.requestComplete(task) },
                             onCyclePriority = { viewModel.cyclePriority(task) },
                             onToggleTimer = {
-                                if (task.timerActive) {
-                                    viewModel.pauseTimer(task)
-                                } else {
-                                    viewModel.startTimer(task)
-                                }
+                                if (task.timerActive) viewModel.pauseTimer(task)
+                                else viewModel.startTimer(task)
                             },
                             onClick = { onTaskClick(task.id) },
-                            onSwipeRight = { viewModel.toggleTaskDone(task) },
+                            onSwipeRight = { viewModel.requestComplete(task) },
                             onSwipeLeft = { onSwipeLeft(task) }
                         )
                     }

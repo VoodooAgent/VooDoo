@@ -9,6 +9,7 @@ data class ProjectContext(
     val name: String,
     val color: Long = 0xFFE0E0E0,
     val sortOrder: Int = 0,
+    val isHidden: Boolean = false,  // НОВОЕ: для скрытия контекста
     val createdAt: Long = System.currentTimeMillis()
 )
 
@@ -31,7 +32,9 @@ data class ProjectContext(
     indices = [
         Index(value = ["contextId"]),
         Index(value = ["parentId"]),
-        Index(value = ["level"])
+        Index(value = ["level"]),
+        Index(value = ["sortOrder"]),
+        Index(value = ["isDone"])
     ]
 )
 data class Task(
@@ -45,9 +48,18 @@ data class Task(
     val result: String = "",
     val isDone: Boolean = false,
     val priority: Int = 0,
+
+    // Основная сортировка в контексте
     val sortOrder: Int = 0,
+
+    // НОВОЕ: независимая сортировка для спец. контекстов
+    val prioritySortOrder: Int? = null,
+    val routineSortOrder: Int? = null,
+    val activeSortOrder: Int? = null,
+
     val plannedStart: Long? = null,
     val plannedEnd: Long? = null,
+    val deadline: Long? = null,  // НОВОЕ: дедлайн
     val reminderMinutesBefore: Int? = null,
     val createdAt: Long = System.currentTimeMillis(),
     val completedAt: Long? = null,
@@ -85,7 +97,12 @@ data class AppSettings(
     val fontSize: Int = 16,
     val noContextName: String = "Без контекста",
     val showTasks: Boolean = true,
-    val showSessions: Boolean = true
+    val showSessions: Boolean = true,
+
+    // НОВОЕ: настройки сортировки
+    val taskSortMode: String = "manual",  // manual, created_at, planned_start, deadline
+    val groupSpecialContexts: Boolean = true,
+    val showCompletedInSwipe: Boolean = true
 )
 
 @Entity(

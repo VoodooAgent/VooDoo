@@ -16,7 +16,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         ICalSyncSetting::class,
         CalendarContextSetting::class
     ],
-    version = 7,
+    version = 8,  // Обновлено с 7 до 8
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -153,6 +153,38 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        // НОВАЯ МИГРАЦИЯ 7 -> 8
+        private val MIGRATION_7_8 = object : Migration(7, 8) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                // 1. Добавляем isHidden в contexts
+                database.execSQL("ALTER TABLE contexts ADD COLUMN isHidden INTEGER NOT NULL DEFAULT 0")
+
+                // 2. Добавляем новые поля в tasks
+                database.execSQL("ALTER TABLE tasks ADD COLUMN prioritySortOrder INTEGER DEFAULT NULL")
+                database.execSQL("ALTER TABLE tasks ADD COLUMN routineSortOrder INTEGER DEFAULT NULL")
+                database.execSQL("ALTER TABLE tasks ADD COLUMN activeSortOrder INTEGER DEFAULT NULL")
+                database.execSQL("ALTER TABLE tasks ADD COLUMN deadline INTEGER DEFAULT NULL")
+
+                // 3. Инициализируем независимые сортировки основным sortOrder для существующих задач
+                database.execSQL("""
+                    UPDATE tasks 
+                    SET prioritySortOrder = sortOrder, 
+                        routineSortOrder = sortOrder, 
+                        activeSortOrder = sortOrder
+                    WHERE prioritySortOrder IS NULL
+                """)
+
+                // 4. Добавляем индексы для новой сортировки
+                database.execSQL("CREATE INDEX index_tasks_sortOrder ON tasks(sortOrder)")
+                database.execSQL("CREATE INDEX index_tasks_isDone ON tasks(isDone)")
+
+                // 5. Добавляем новые поля в app_settings
+                database.execSQL("ALTER TABLE app_settings ADD COLUMN taskSortMode TEXT NOT NULL DEFAULT 'manual'")
+                database.execSQL("ALTER TABLE app_settings ADD COLUMN groupSpecialContexts INTEGER NOT NULL DEFAULT 1")
+                database.execSQL("ALTER TABLE app_settings ADD COLUMN showCompletedInSwipe INTEGER NOT NULL DEFAULT 1")
+            }
+        }
+
         fun getDatabase(context: Context): AppDatabase {
             return INSTANCE ?: synchronized(this) {
                 val instance = Room.databaseBuilder(
@@ -160,7 +192,7 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "voodoo_database"
                 )
-                    .addMigrations(MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7)
+                    .addMigrations(MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8)
                     .build()
                 INSTANCE = instance
                 instance

@@ -24,7 +24,6 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
-import androidx.compose.material.icons.filled.PriorityHigh
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
@@ -51,8 +50,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.voodoo.data.Task
+import com.example.voodoo.data.TaskWithChildren
 import com.example.voodoo.presentation.MainViewModel
 import com.example.voodoo.presentation.TaskListViewModel
+import com.example.voodoo.presentation.components.SwipeConfirmationDialog
 import com.example.voodoo.presentation.components.TaskCard
 import com.example.voodoo.presentation.components.TaskSwipeMenu
 import java.util.Calendar
@@ -109,6 +110,18 @@ private fun startOfYear(): Long {
     return calendar.timeInMillis
 }
 
+private fun flattenTree(tree: List<TaskWithChildren>): List<Pair<Task, Int>> {
+    val result = mutableListOf<Pair<Task, Int>>()
+
+    fun traverse(node: TaskWithChildren, level: Int) {
+        result.add(node.task to level)
+        node.children.forEach { traverse(it, level + 1) }
+    }
+
+    tree.forEach { traverse(it, 0) }
+    return result
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TaskListScreen(
@@ -129,9 +142,13 @@ fun TaskListScreen(
     val settings by mainViewModel.settings.collectAsState()
     val durations by taskListViewModel.taskDurations.collectAsState()
 
+    val pendingCompletionTask by taskListViewModel.pendingCompletionTask.collectAsState()
+
     var showCreateDialog by remember { mutableStateOf(false) }
     var showSwipeMenu by remember { mutableStateOf<Task?>(null) }
     var createParentId by remember { mutableStateOf<Long?>(null) }
+
+    var completedSubtasks by remember { mutableStateOf<List<Task>>(emptyList()) }
 
     var completedExpanded by remember(contextId) { mutableStateOf(false) }
     var expandedPeriods by remember(contextId) { mutableStateOf<Set<String>>(emptySet()) }
@@ -162,8 +179,14 @@ fun TaskListScreen(
 
     val anyExpanded = expandedIds.isNotEmpty()
 
-    val activeTasks = remember(tasks) {
-        tasks.filter { !it.isDone }.sortedBy { it.sortOrder }
+    val activeTasks = remember(tasks, settings.taskSortMode) {
+        val filtered = tasks.filter { !it.isDone }
+        when (settings.taskSortMode) {
+            "created_at" -> filtered.sortedByDescending { it.createdAt }
+            "planned_start" -> filtered.sortedByDescending { it.plannedStart ?: 0L }
+            "deadline" -> filtered.sortedByDescending { it.deadline ?: 0L }
+            else -> filtered.sortedBy { it.sortOrder }
+        }
     }
 
     val visibleRootTasks = remember(activeTasks) {
@@ -223,35 +246,33 @@ fun TaskListScreen(
                     }
                 },
                 actions = {
-                    // Новая кнопка K для Календаря
+                    // Календарь
                     IconButton(onClick = onCalendarClick) {
                         Text(
-                            text = "K",
-                            color = barContentColor,
-                            fontWeight = FontWeight.Bold,
+                            text = "📅",
                             style = MaterialTheme.typography.titleMedium
                         )
                     }
-                    // Кнопка "A" для активных таймеров — перед кнопкой "R"
+                    // Активные таймеры
                     IconButton(onClick = onActiveTimerClick) {
                         Text(
-                            text = "A",
-                            color = barContentColor,
-                            fontWeight = FontWeight.Bold,
+                            text = "⏱️",
                             style = MaterialTheme.typography.titleMedium
                         )
                     }
-                    // Кнопка "R" для рутины — перед кнопкой "!"
+                    // Рутина
                     IconButton(onClick = onRoutineClick) {
                         Text(
-                            text = "R",
-                            color = barContentColor,
-                            fontWeight = FontWeight.Bold,
+                            text = "🔄",
                             style = MaterialTheme.typography.titleMedium
                         )
                     }
+                    // Приоритетные
                     IconButton(onClick = onPriorityClick) {
-                        Icon(Icons.Default.PriorityHigh, contentDescription = "Приоритетные задачи")
+                        Text(
+                            text = "⭐",
+                            style = MaterialTheme.typography.titleMedium
+                        )
                     }
                 }
             )
@@ -299,9 +320,9 @@ fun TaskListScreen(
                         item(key = "label_today") {
                             PeriodLabel(text = "Сегодня", contentColor = barContentColor)
                         }
-                        doneItems(
+                        doneTreeItems(
                             prefix = "today",
-                            list = doneToday,
+                            tasks = doneToday,
                             fontSize = settings.fontSize,
                             viewModel = taskListViewModel,
                             durations = durations,
@@ -382,6 +403,10 @@ fun TaskListScreen(
     }
 
     showSwipeMenu?.let { task ->
+        LaunchedEffect(task.id) {
+            completedSubtasks = taskListViewModel.getCompletedSubtasksSync(task.id)
+        }
+
         TaskSwipeMenu(
             onDismiss = { showSwipeMenu = null },
             onAddSubtaskClick = {
@@ -389,6 +414,16 @@ fun TaskListScreen(
                 showCreateDialog = true
                 showSwipeMenu = null
             },
+            onICalClick = { },
+            onEditClick = { onTaskClick(task.id) },
+            onMoveUpClick = if (settings.taskSortMode == "manual") {{
+                taskListViewModel.moveTaskUp(task)
+                showSwipeMenu = null
+            }} else null,
+            onMoveDownClick = if (settings.taskSortMode == "manual") {{
+                taskListViewModel.moveTaskDown(task)
+                showSwipeMenu = null
+            }} else null,
             onDeleteClick = {
                 taskListViewModel.deleteTask(task)
                 showSwipeMenu = null
@@ -397,7 +432,16 @@ fun TaskListScreen(
             onRestoreClick = {
                 taskListViewModel.toggleTaskDone(task)
                 showSwipeMenu = null
-            }
+            },
+            completedSubtasks = completedSubtasks
+        )
+    }
+
+    pendingCompletionTask?.let { task ->
+        SwipeConfirmationDialog(
+            onDismiss = { taskListViewModel.cancelCascadeComplete() },
+            onConfirm = { taskListViewModel.confirmCascadeComplete() },
+            onCancel = { taskListViewModel.cancelCascadeComplete() }
         )
     }
 }
@@ -449,7 +493,7 @@ fun TaskTreeItem(
                         else viewModel.startTimer(task)
                     },
                     onClick = { onTaskClick(task.id) },
-                    onSwipeRight = { viewModel.toggleTaskDone(task) },
+                    onSwipeRight = { viewModel.requestComplete(task) },
                     onSwipeLeft = { onSwipeLeft(task) }
                 )
             }
@@ -551,30 +595,41 @@ private fun CollapsiblePeriodHeader(
     }
 }
 
-private fun LazyListScope.doneItems(
+private fun LazyListScope.doneTreeItems(
     prefix: String,
-    list: List<Task>,
+    tasks: List<Task>,
     fontSize: Int,
     viewModel: TaskListViewModel,
     durations: Map<Long, Long>,
     onTaskClick: (Long) -> Unit,
     onSwipeMenuRequest: (Task) -> Unit
 ) {
-    items(list, key = { "${prefix}_${it.id}" }) { task ->
-        TaskCard(
-            task = task,
-            pastSessionsDuration = durations[task.id] ?: 0L,
-            fontSize = fontSize,
-            onToggleDone = { viewModel.toggleTaskDone(task) },
-            onCyclePriority = { viewModel.cyclePriority(task) },
-            onToggleTimer = {
-                if (task.timerActive) viewModel.pauseTimer(task)
-                else viewModel.startTimer(task)
-            },
-            onClick = { onTaskClick(task.id) },
-            onSwipeRight = { viewModel.toggleTaskDone(task) },
-            onSwipeLeft = { onSwipeMenuRequest(task) }
-        )
+    val tree = viewModel.buildTreeForPeriod(tasks)
+    val flatList = flattenTree(tree)
+
+    items(flatList, key = { "${prefix}_${it.first.id}" }) { (task, level) ->
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            if (level > 0) {
+                Spacer(modifier = Modifier.width((level * 20).dp))
+            }
+
+            Box(modifier = Modifier.weight(1f)) {
+                TaskCard(
+                    task = task,
+                    pastSessionsDuration = durations[task.id] ?: 0L,
+                    fontSize = fontSize,
+                    onToggleDone = { viewModel.toggleTaskDone(task) },
+                    onCyclePriority = { viewModel.cyclePriority(task) },
+                    onToggleTimer = { },
+                    onClick = { onTaskClick(task.id) },
+                    onSwipeRight = { viewModel.toggleTaskDone(task) },
+                    onSwipeLeft = { onSwipeMenuRequest(task) }
+                )
+            }
+        }
     }
 }
 
@@ -606,9 +661,9 @@ private fun LazyListScope.collapsiblePeriod(
     }
 
     if (expanded) {
-        doneItems(
+        doneTreeItems(
             prefix = periodKey,
-            list = list,
+            tasks = list,
             fontSize = fontSize,
             viewModel = viewModel,
             durations = durations,

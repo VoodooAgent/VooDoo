@@ -96,7 +96,11 @@ fun VooDooNavHost(viewModel: MainViewModel) {
                         navController.navigate("context_no")
                     }
                 },
-                onSettingsClick = { navController.navigate("settings") }
+                onSettingsClick = { navController.navigate("settings") },
+                onPriorityClick = { navController.navigate("priority") },
+                onRoutineClick = { navController.navigate("routine") },
+                onActiveTimerClick = { navController.navigate("active_timer") },
+                onCalendarClick = { navController.navigate("calendar") }
             )
         }
         composable(
@@ -131,21 +135,12 @@ fun VooDooNavHost(viewModel: MainViewModel) {
             SettingsScreen(
                 onBackClick = { navController.popBackStack() },
                 onContextsClick = { navController.navigate("contexts") },
-                onICalSyncClick = { navController.navigate("ical_sync") },
-                onExportClick = {
-                    val dateFormat = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault())
-                    val fileName = "voodoo_export_${dateFormat.format(Date())}.csv"
-                    exportLauncher.launch(fileName)
-                },
-                onImportClick = {
-                    importLauncher.launch(arrayOf("text/csv", "text/comma-separated-values", "text/plain", "*/*"))
-                }
+                viewModel = viewModel
             )
         }
         composable("contexts") {
             ContextsManagementScreen(
-                onBackClick = { navController.popBackStack() },
-                onRoutineClick = { navController.navigate("routine") }
+                onBackClick = { navController.popBackStack() }
             )
         }
         composable(

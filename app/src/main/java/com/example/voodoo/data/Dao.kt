@@ -8,6 +8,9 @@ interface ProjectContextDao {
     @Query("SELECT * FROM contexts ORDER BY sortOrder ASC, id ASC")
     fun getAllContexts(): Flow<List<ProjectContext>>
 
+    @Query("SELECT * FROM contexts WHERE isHidden = 0 ORDER BY sortOrder ASC, id ASC")
+    fun getVisibleContexts(): Flow<List<ProjectContext>>
+
     @Query("SELECT * FROM contexts ORDER BY sortOrder ASC, id ASC")
     suspend fun getAllContextsSync(): List<ProjectContext>
 
@@ -34,6 +37,9 @@ interface ProjectContextDao {
 
     @Query("UPDATE contexts SET sortOrder = :sortOrder WHERE id = :contextId")
     suspend fun updateSortOrder(contextId: Long, sortOrder: Int)
+
+    @Query("UPDATE contexts SET isHidden = :isHidden WHERE id = :contextId")
+    suspend fun updateHidden(contextId: Long, isHidden: Boolean)
 }
 
 @Dao
@@ -56,17 +62,22 @@ interface TaskDao {
     @Query("SELECT * FROM tasks WHERE id = :taskId")
     fun getTaskById(taskId: Long): Flow<Task?>
 
-    @Query("SELECT * FROM tasks WHERE priority > 0 AND priority < 4 ORDER BY priority DESC, sortOrder ASC")
+    // Специальные контексты с независимой сортировкой
+    @Query("SELECT * FROM tasks WHERE priority > 0 AND priority < 4 AND isDone = 0 ORDER BY prioritySortOrder ASC, priority DESC, sortOrder ASC")
     fun getPriorityTasks(): Flow<List<Task>>
 
-    @Query("SELECT * FROM tasks WHERE priority = 4 ORDER BY contextId ASC, sortOrder ASC")
+    @Query("SELECT * FROM tasks WHERE priority = 4 AND isDone = 0 ORDER BY routineSortOrder ASC, sortOrder ASC")
     fun getRoutineTasks(): Flow<List<Task>>
 
-    @Query("SELECT * FROM tasks WHERE timerActive = 1")
+    @Query("SELECT * FROM tasks WHERE timerActive = 1 ORDER BY activeSortOrder ASC, sortOrder ASC")
     suspend fun getActiveTimerTasks(): List<Task>
 
-    @Query("SELECT * FROM tasks WHERE timerActive = 1")
+    @Query("SELECT * FROM tasks WHERE timerActive = 1 ORDER BY activeSortOrder ASC, sortOrder ASC")
     fun getActiveTimerTasksFlow(): Flow<List<Task>>
+
+    // НОВОЕ: выполненные подзадачи для свайпа
+    @Query("SELECT * FROM tasks WHERE parentId = :parentId AND isDone = 1 ORDER BY completedAt DESC")
+    fun getCompletedSubtasks(parentId: Long): Flow<List<Task>>
 
     @Query("SELECT * FROM tasks WHERE plannedStart IS NOT NULL AND plannedEnd IS NOT NULL")
     suspend fun getPlannedTasks(): List<Task>
@@ -98,6 +109,16 @@ interface TaskDao {
     @Query("UPDATE tasks SET sortOrder = :sortOrder WHERE id = :taskId")
     suspend fun updateSortOrder(taskId: Long, sortOrder: Int)
 
+    // НОВОЕ: обновление независимых сортировок
+    @Query("UPDATE tasks SET prioritySortOrder = :sortOrder WHERE id = :taskId")
+    suspend fun updatePrioritySortOrder(taskId: Long, sortOrder: Int)
+
+    @Query("UPDATE tasks SET routineSortOrder = :sortOrder WHERE id = :taskId")
+    suspend fun updateRoutineSortOrder(taskId: Long, sortOrder: Int)
+
+    @Query("UPDATE tasks SET activeSortOrder = :sortOrder WHERE id = :taskId")
+    suspend fun updateActiveSortOrder(taskId: Long, sortOrder: Int)
+
     @Query("UPDATE tasks SET contextId = :contextId WHERE id = :taskId")
     suspend fun updateContext(taskId: Long, contextId: Long?)
 
@@ -115,6 +136,33 @@ interface TaskDao {
         ))
     """)
     suspend fun resetChildrenLevels(parentId: Long)
+
+    // НОВОЕ: каскадное выполнение всех потомков
+    @Query("""
+        WITH RECURSIVE descendants(id) AS (
+            SELECT id FROM tasks WHERE parentId = :parentId
+            UNION ALL
+            SELECT t.id FROM tasks t INNER JOIN descendants d ON t.parentId = d.id
+        )
+        UPDATE tasks SET isDone = 1, completedAt = :completedAt 
+        WHERE id IN (SELECT id FROM descendants)
+    """)
+    suspend fun cascadeComplete(parentId: Long, completedAt: Long)
+
+    // НОВОЕ: подсчет активных потомков
+    @Query("""
+        WITH RECURSIVE descendants(id) AS (
+            SELECT id FROM tasks WHERE parentId = :parentId
+            UNION ALL
+            SELECT t.id FROM tasks t INNER JOIN descendants d ON t.parentId = d.id
+        )
+        SELECT COUNT(*) FROM tasks WHERE id IN (SELECT id FROM descendants) AND isDone = 0
+    """)
+    suspend fun countActiveDescendants(parentId: Long): Int
+
+    // НОВОЕ: массовое обновление sortOrder для ребаланса
+    @Query("UPDATE tasks SET sortOrder = sortOrder * 10000 WHERE contextId = :contextId")
+    suspend fun rebalanceSortOrder(contextId: Long)
 }
 
 @Dao

@@ -34,10 +34,14 @@ val CONTEXT_COLORS = listOf(
 fun HomeScreen(
     onContextClick: (Long?) -> Unit,
     onSettingsClick: () -> Unit,
+    onPriorityClick: () -> Unit = {},
+    onRoutineClick: () -> Unit = {},
+    onActiveTimerClick: () -> Unit = {},
+    onCalendarClick: () -> Unit = {},
     contextViewModel: ContextListViewModel = viewModel(),
     mainViewModel: MainViewModel = viewModel()
 ) {
-    val contexts by contextViewModel.contexts.collectAsState()
+    val contexts by contextViewModel.visibleContexts.collectAsState()
     val settings by mainViewModel.settings.collectAsState()
     var showCreateDialog by remember { mutableStateOf(false) }
 
@@ -54,6 +58,36 @@ fun HomeScreen(
                 navigationIcon = {
                     IconButton(onClick = onSettingsClick) {
                         Icon(Icons.Default.Menu, contentDescription = "Меню")
+                    }
+                },
+                actions = {
+                    // Календарь
+                    IconButton(onClick = onCalendarClick) {
+                        Text(
+                            text = "📅",
+                            style = MaterialTheme.typography.titleMedium
+                        )
+                    }
+                    // Активные таймеры
+                    IconButton(onClick = onActiveTimerClick) {
+                        Text(
+                            text = "⏱️",
+                            style = MaterialTheme.typography.titleMedium
+                        )
+                    }
+                    // Рутина
+                    IconButton(onClick = onRoutineClick) {
+                        Text(
+                            text = "🔄",
+                            style = MaterialTheme.typography.titleMedium
+                        )
+                    }
+                    // Приоритетные
+                    IconButton(onClick = onPriorityClick) {
+                        Text(
+                            text = "⭐",
+                            style = MaterialTheme.typography.titleMedium
+                        )
                     }
                 }
             )

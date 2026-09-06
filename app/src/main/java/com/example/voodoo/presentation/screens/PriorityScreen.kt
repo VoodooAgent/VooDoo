@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.ExpandLess
@@ -30,6 +31,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.voodoo.data.Task
@@ -37,7 +39,6 @@ import com.example.voodoo.presentation.MainViewModel
 import com.example.voodoo.presentation.TaskListViewModel
 import com.example.voodoo.presentation.components.TaskCard
 import com.example.voodoo.presentation.components.TaskSwipeMenu
-import com.example.voodoo.presentation.screens.CreateTaskDialog
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -56,9 +57,8 @@ fun PriorityScreen(
     var showCreateDialog by remember { mutableStateOf(false) }
     var createParent by remember { mutableStateOf<Task?>(null) }
 
-    // Фильтруем: только АКТИВНЫЕ приоритетные задачи (без R-приоритета, т.к. он уже отсеян в DAO)
     val activePriorityTasks = remember(priorityTasks) {
-        priorityTasks.filter { !it.isDone }
+        priorityTasks.filter { !it.isDone }.sortedBy { it.prioritySortOrder ?: it.sortOrder }
     }
 
     val tasksByContext = activePriorityTasks.groupBy { it.contextId }
@@ -71,55 +71,41 @@ fun PriorityScreen(
         topBar = {
             TopAppBar(
                 title = {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            text = "⭐",
+                            style = MaterialTheme.typography.titleLarge
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
                         Text("Приоритетные задачи")
 
-                        Spacer(modifier = Modifier.width(4.dp))
-
-                        IconButton(
-                            onClick = {
-                                collapsedContexts = if (allExpanded) {
-                                    allContextKeys
-                                } else {
-                                    emptySet()
-                                }
-                            },
-                            modifier = Modifier.size(36.dp)
-                        ) {
-                            Icon(
-                                imageVector = if (allExpanded) {
-                                    Icons.Default.ExpandLess
-                                } else {
-                                    Icons.Default.ExpandMore
+                        if (settings.groupSpecialContexts) {
+                            Spacer(modifier = Modifier.width(4.dp))
+                            IconButton(
+                                onClick = {
+                                    collapsedContexts = if (allExpanded) allContextKeys else emptySet()
                                 },
-                                contentDescription = if (allExpanded) {
-                                    "Свернуть все контексты"
-                                } else {
-                                    "Развернуть все контексты"
-                                },
-                                modifier = Modifier.size(28.dp)
-                            )
+                                modifier = Modifier.size(36.dp)
+                            ) {
+                                Icon(
+                                    imageVector = if (allExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                                    contentDescription = if (allExpanded) "Свернуть все контексты" else "Развернуть все контексты",
+                                    modifier = Modifier.size(28.dp)
+                                )
+                            }
                         }
                     }
                 },
                 navigationIcon = {
                     IconButton(onClick = onBackClick) {
-                        Icon(
-                            Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "Назад"
-                        )
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Назад")
                     }
                 }
             )
         }
     ) { padding ->
         LazyColumn(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding)
-                .padding(16.dp),
+            modifier = Modifier.fillMaxSize().padding(padding).padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             if (activePriorityTasks.isEmpty()) {
@@ -132,30 +118,49 @@ fun PriorityScreen(
                 }
             }
 
-            tasksByContext.forEach { (contextId, tasks) ->
-                val contextName = if (contextId == null) {
-                    settings.noContextName
-                } else {
-                    contexts.find { it.id == contextId }?.name ?: "Контекст $contextId"
-                }
+            if (settings.groupSpecialContexts) {
+                tasksByContext.forEach { (contextId, tasks) ->
+                    val contextName = if (contextId == null) {
+                        settings.noContextName
+                    } else {
+                        contexts.find { it.id == contextId }?.name ?: "Контекст $contextId"
+                    }
 
-                item(key = contextId?.toString() ?: "no_context") {
-                    PriorityContextSection(
-                        contextName = contextName,
-                        tasks = tasks,
-                        durations = durations,
+                    item(key = contextId?.toString() ?: "no_context") {
+                        PriorityContextSection(
+                            contextName = contextName,
+                            tasks = tasks,
+                            durations = durations,
+                            fontSize = settings.fontSize,
+                            expanded = !collapsedContexts.contains(contextId),
+                            onToggleExpanded = {
+                                collapsedContexts = if (collapsedContexts.contains(contextId)) {
+                                    collapsedContexts - contextId
+                                } else {
+                                    collapsedContexts + contextId
+                                }
+                            },
+                            viewModel = taskListViewModel,
+                            onTaskClick = onTaskClick,
+                            onSwipeLeft = { task -> showSwipeMenu = task }
+                        )
+                    }
+                }
+            } else {
+                items(activePriorityTasks, key = { "priority_${it.id}" }) { task ->
+                    TaskCard(
+                        task = task,
+                        pastSessionsDuration = durations[task.id] ?: 0L,
                         fontSize = settings.fontSize,
-                        expanded = !collapsedContexts.contains(contextId),
-                        onToggleExpanded = {
-                            collapsedContexts = if (collapsedContexts.contains(contextId)) {
-                                collapsedContexts - contextId
-                            } else {
-                                collapsedContexts + contextId
-                            }
+                        onToggleDone = { taskListViewModel.requestComplete(task) },
+                        onCyclePriority = { taskListViewModel.cyclePriority(task) },
+                        onToggleTimer = {
+                            if (task.timerActive) taskListViewModel.pauseTimer(task)
+                            else taskListViewModel.startTimer(task)
                         },
-                        viewModel = taskListViewModel,
-                        onTaskClick = onTaskClick,
-                        onSwipeLeft = { task -> showSwipeMenu = task }
+                        onClick = { onTaskClick(task.id) },
+                        onSwipeRight = { taskListViewModel.requestComplete(task) },
+                        onSwipeLeft = { showSwipeMenu = task }
                     )
                 }
             }
@@ -168,6 +173,16 @@ fun PriorityScreen(
             onAddSubtaskClick = {
                 createParent = task
                 showCreateDialog = true
+                showSwipeMenu = null
+            },
+            onICalClick = { },
+            onEditClick = { onTaskClick(task.id) },
+            onMoveUpClick = {
+                taskListViewModel.movePriorityTaskUp(task)
+                showSwipeMenu = null
+            },
+            onMoveDownClick = {
+                taskListViewModel.movePriorityTaskDown(task)
                 showSwipeMenu = null
             },
             onDeleteClick = {
@@ -212,31 +227,20 @@ fun PriorityContextSection(
     onTaskClick: (Long) -> Unit,
     onSwipeLeft: (Task) -> Unit
 ) {
-    Card(
-        modifier = Modifier.fillMaxWidth()
-    ) {
+    Card(modifier = Modifier.fillMaxWidth()) {
         Column {
             Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 8.dp, vertical = 2.dp),
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 2.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
                     text = contextName,
                     style = MaterialTheme.typography.titleMedium,
-                    modifier = Modifier
-                        .weight(1f)
-                        .padding(start = 8.dp)
+                    modifier = Modifier.weight(1f).padding(start = 8.dp)
                 )
-
                 IconButton(onClick = onToggleExpanded) {
                     Icon(
-                        imageVector = if (expanded) {
-                            Icons.Default.ExpandLess
-                        } else {
-                            Icons.Default.ExpandMore
-                        },
+                        imageVector = if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
                         contentDescription = if (expanded) "Свернуть" else "Развернуть"
                     )
                 }
@@ -244,10 +248,7 @@ fun PriorityContextSection(
 
             if (expanded) {
                 Column(
-                    modifier = Modifier.padding(
-                        horizontal = 8.dp,
-                        vertical = 4.dp
-                    ),
+                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
                     verticalArrangement = Arrangement.spacedBy(2.dp)
                 ) {
                     tasks.forEach { task ->
@@ -255,17 +256,14 @@ fun PriorityContextSection(
                             task = task,
                             pastSessionsDuration = durations[task.id] ?: 0L,
                             fontSize = fontSize,
-                            onToggleDone = { viewModel.toggleTaskDone(task) },
+                            onToggleDone = { viewModel.requestComplete(task) },
                             onCyclePriority = { viewModel.cyclePriority(task) },
                             onToggleTimer = {
-                                if (task.timerActive) {
-                                    viewModel.pauseTimer(task)
-                                } else {
-                                    viewModel.startTimer(task)
-                                }
+                                if (task.timerActive) viewModel.pauseTimer(task)
+                                else viewModel.startTimer(task)
                             },
                             onClick = { onTaskClick(task.id) },
-                            onSwipeRight = { viewModel.toggleTaskDone(task) },
+                            onSwipeRight = { viewModel.requestComplete(task) },
                             onSwipeLeft = { onSwipeLeft(task) }
                         )
                     }
