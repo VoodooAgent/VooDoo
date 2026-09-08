@@ -72,7 +72,6 @@ import java.time.YearMonth
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.time.format.TextStyle
-import java.time.temporal.ChronoUnit
 import java.util.Locale
 import kotlin.comparisons.compareBy
 
@@ -88,7 +87,8 @@ data class TimelineEvent(
 data class LayoutEvent(
     val event: TimelineEvent,
     val column: Int,
-    val totalColumns: Int
+    val totalColumns: Int,
+    val slotEndMinutes: Int? = null
 )
 
 fun calculateEventLayouts(events: List<TimelineEvent>): List<LayoutEvent> {
@@ -120,28 +120,45 @@ fun calculateEventLayouts(events: List<TimelineEvent>): List<LayoutEvent> {
 }
 
 private fun processCluster(cluster: List<TimelineEvent>): List<LayoutEvent> {
-    val tempLayouts = mutableListOf<Pair<TimelineEvent, Int>>()
-    val lanes = mutableListOf<LocalTime>()
+    val sortedCluster = cluster.sortedWith(compareBy({ it.startTime }, { it.endTime }))
+    val laneOf = IntArray(sortedCluster.size) { -1 }
+    val laneEnds = mutableListOf<LocalTime>()
+    val laneIndices = mutableListOf<MutableList<Int>>()
 
-    for (event in cluster) {
+    for ((index, event) in sortedCluster.withIndex()) {
         var laneIndex = -1
-        for (i in lanes.indices) {
-            if (lanes[i] <= event.startTime) {
+        for (i in laneEnds.indices) {
+            if (!event.startTime.isBefore(laneEnds[i])) {
                 laneIndex = i
-                lanes[i] = event.endTime
+                laneEnds[i] = event.endTime
                 break
             }
         }
         if (laneIndex == -1) {
-            laneIndex = lanes.size
-            lanes.add(event.endTime)
+            laneIndex = laneEnds.size
+            laneEnds.add(event.endTime)
+            laneIndices.add(mutableListOf())
         }
-        tempLayouts.add(event to laneIndex)
+        laneOf[index] = laneIndex
+        laneIndices[laneIndex].add(index)
     }
 
-    val totalColumns = lanes.size
-    return tempLayouts.map { (event, laneIndex) ->
-        LayoutEvent(event, laneIndex, totalColumns)
+    val totalColumns = laneEnds.size
+    val slotEndMinutes = IntArray(sortedCluster.size) { Int.MAX_VALUE }
+    for (lane in laneIndices) {
+        for (i in 0 until lane.size - 1) {
+            val nextEvent = sortedCluster[lane[i + 1]]
+            slotEndMinutes[lane[i]] = nextEvent.startTime.hour * 60 + nextEvent.startTime.minute
+        }
+    }
+
+    return sortedCluster.indices.map { index ->
+        LayoutEvent(
+            event = sortedCluster[index],
+            column = laneOf[index],
+            totalColumns = totalColumns,
+            slotEndMinutes = slotEndMinutes[index].takeIf { it != Int.MAX_VALUE }
+        )
     }
 }
 
@@ -315,7 +332,9 @@ fun MonthView(
                 } ?: false
             }
             val daySessions = filteredSessions.filter { session ->
-                millisToLocalDate(session.startTime) == day.date
+                val startDate = millisToLocalDate(session.startTime)
+                val endDate = millisToLocalDate(session.endTime)
+                !startDate.isAfter(day.date) && !endDate.isBefore(day.date)
             }
             DayCell(
                 day = day,
@@ -460,7 +479,9 @@ fun WeekView(
                 } ?: false
             }
             val daySessions = filteredSessions.filter { session ->
-                millisToLocalDate(session.startTime) == day.date
+                val startDate = millisToLocalDate(session.startTime)
+                val endDate = millisToLocalDate(session.endTime)
+                !startDate.isAfter(day.date) && !endDate.isBefore(day.date)
             }
             WeekDayCell(
                 day = day,
@@ -581,7 +602,9 @@ fun DayView(
         } ?: false
     }
     val daySessions = filteredSessions.filter { session ->
-        millisToLocalDate(session.startTime) == selectedDate
+        val startDate = millisToLocalDate(session.startTime)
+        val endDate = millisToLocalDate(session.endTime)
+        !startDate.isAfter(selectedDate) && !endDate.isBefore(selectedDate)
     }
 
     Column(
@@ -602,6 +625,7 @@ fun DayView(
             DayTimeline(
                 dayTasks = dayTasks,
                 daySessions = daySessions,
+                selectedDate = selectedDate,
                 contexts = contexts,
                 allTasks = tasks,
                 onTaskClick = onTaskClick
@@ -614,6 +638,7 @@ fun DayView(
 fun DayTimeline(
     dayTasks: List<Task>,
     daySessions: List<TimerSession>,
+    selectedDate: LocalDate,
     contexts: List<ProjectContext>,
     allTasks: List<Task>,
     onTaskClick: (Long) -> Unit
@@ -622,7 +647,7 @@ fun DayTimeline(
     val timelineHeightDp = hourHeightDp * 24
     val sessionColor = MaterialTheme.colorScheme.tertiary
 
-    val rawEvents = remember(dayTasks, daySessions, contexts, allTasks, sessionColor) {
+    val rawEvents = remember(dayTasks, daySessions, selectedDate, contexts, allTasks, sessionColor) {
         val taskEvents = dayTasks.mapNotNull { task ->
             task.plannedStart?.let { startMillis ->
                 val startTime = millisToLocalTime(startMillis)
@@ -639,11 +664,26 @@ fun DayTimeline(
                 )
             }
         }
-        val sessionEvents = daySessions.map { session ->
+        val sessionEvents = daySessions.mapNotNull { session ->
+            val startDate = millisToLocalDate(session.startTime)
+            val endDate = millisToLocalDate(session.endTime)
+            if (endDate.isBefore(selectedDate) || startDate.isAfter(selectedDate)) {
+                return@mapNotNull null
+            }
             val task = allTasks.find { it.id == session.taskId }
+            val startTime = if (startDate.isBefore(selectedDate)) {
+                LocalTime.MIDNIGHT
+            } else {
+                millisToLocalTime(session.startTime)
+            }
+            val endTime = if (endDate.isAfter(selectedDate)) {
+                LocalTime.MAX
+            } else {
+                millisToLocalTime(session.endTime)
+            }
             TimelineEvent(
-                startTime = millisToLocalTime(session.startTime),
-                endTime = millisToLocalTime(session.endTime),
+                startTime = startTime,
+                endTime = endTime,
                 title = task?.title ?: "Сессия",
                 color = sessionColor,
                 isSession = true,
@@ -696,7 +736,20 @@ fun DayTimeline(
             }
 
             val topOffsetDp = (hourHeightDp * startMinutes / 60f)
-            val eventHeightDp = (hourHeightDp * durationMinutes / 60f).coerceAtLeast(36f)
+            val minHeightDp = 20f
+            val maxHeightDp = layoutEvent.slotEndMinutes?.let { slotEnd ->
+                val slotDuration = if (slotEnd > startMinutes) {
+                    slotEnd - startMinutes
+                } else {
+                    24 * 60 - startMinutes
+                }
+                if (slotDuration > 0) {
+                    (hourHeightDp * slotDuration / 60f).coerceAtLeast(minHeightDp)
+                } else {
+                    minHeightDp
+                }
+            } ?: (hourHeightDp * durationMinutes / 60f).coerceAtLeast(minHeightDp)
+            val eventHeightDp = (hourHeightDp * durationMinutes / 60f).coerceIn(minHeightDp, maxHeightDp)
 
             val widthFraction = 1f / layoutEvent.totalColumns
             val columnWidth = availableWidth * widthFraction
@@ -800,5 +853,4 @@ private fun millisToLocalTime(millis: Long): LocalTime {
     return Instant.ofEpochMilli(millis)
         .atZone(ZoneId.systemDefault())
         .toLocalTime()
-        .truncatedTo(ChronoUnit.MINUTES)
 }
