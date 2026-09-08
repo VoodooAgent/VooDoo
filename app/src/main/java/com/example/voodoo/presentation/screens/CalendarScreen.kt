@@ -75,6 +75,9 @@ import java.time.format.TextStyle
 import java.util.Locale
 import kotlin.comparisons.compareBy
 
+private const val MIN_CARD_HEIGHT_MINUTES = 20
+private const val MIN_CARD_HEIGHT_DP = 20f
+
 data class TimelineEvent(
     val startTime: LocalTime,
     val endTime: LocalTime,
@@ -91,52 +94,71 @@ data class LayoutEvent(
     val slotEndMinutes: Int? = null
 )
 
-fun calculateEventLayouts(events: List<TimelineEvent>): List<LayoutEvent> {
+fun calculateEventLayouts(
+    events: List<TimelineEvent>,
+    minDurationMinutes: Int = 20
+): List<LayoutEvent> {
     if (events.isEmpty()) return emptyList()
 
     val sorted = events.sortedWith(compareBy({ it.startTime }, { it.endTime }))
     val allLayouts = mutableListOf<LayoutEvent>()
 
     var currentCluster = mutableListOf<TimelineEvent>()
-    var clusterEnd = sorted.first().endTime
+    var clusterEndMinutes = effectiveEndMinutes(sorted.first(), minDurationMinutes)
 
     for (event in sorted) {
-        if (event.startTime < clusterEnd) {
+        val startMinutes = event.startTime.hour * 60 + event.startTime.minute
+        if (startMinutes < clusterEndMinutes) {
             currentCluster.add(event)
-            if (event.endTime > clusterEnd) clusterEnd = event.endTime
+            clusterEndMinutes = maxOf(clusterEndMinutes, effectiveEndMinutes(event, minDurationMinutes))
         } else {
             if (currentCluster.isNotEmpty()) {
-                allLayouts.addAll(processCluster(currentCluster))
+                allLayouts.addAll(processCluster(currentCluster, minDurationMinutes))
             }
             currentCluster = mutableListOf(event)
-            clusterEnd = event.endTime
+            clusterEndMinutes = effectiveEndMinutes(event, minDurationMinutes)
         }
     }
     if (currentCluster.isNotEmpty()) {
-        allLayouts.addAll(processCluster(currentCluster))
+        allLayouts.addAll(processCluster(currentCluster, minDurationMinutes))
     }
 
     return allLayouts
 }
 
-private fun processCluster(cluster: List<TimelineEvent>): List<LayoutEvent> {
+private fun effectiveEndMinutes(event: TimelineEvent, minDurationMinutes: Int): Int {
+    val startMinutes = event.startTime.hour * 60 + event.startTime.minute
+    val endMinutes = event.endTime.hour * 60 + event.endTime.minute
+    val duration = if (endMinutes > startMinutes) {
+        endMinutes - startMinutes
+    } else {
+        24 * 60 - startMinutes + endMinutes
+    }
+    return startMinutes + maxOf(duration, minDurationMinutes)
+}
+
+private fun processCluster(
+    cluster: List<TimelineEvent>,
+    minDurationMinutes: Int
+): List<LayoutEvent> {
     val sortedCluster = cluster.sortedWith(compareBy({ it.startTime }, { it.endTime }))
     val laneOf = IntArray(sortedCluster.size) { -1 }
-    val laneEnds = mutableListOf<LocalTime>()
+    val laneEnds = mutableListOf<Int>()
     val laneIndices = mutableListOf<MutableList<Int>>()
 
     for ((index, event) in sortedCluster.withIndex()) {
+        val startMinutes = event.startTime.hour * 60 + event.startTime.minute
         var laneIndex = -1
         for (i in laneEnds.indices) {
-            if (!event.startTime.isBefore(laneEnds[i])) {
+            if (startMinutes >= laneEnds[i]) {
                 laneIndex = i
-                laneEnds[i] = event.endTime
+                laneEnds[i] = effectiveEndMinutes(event, minDurationMinutes)
                 break
             }
         }
         if (laneIndex == -1) {
             laneIndex = laneEnds.size
-            laneEnds.add(event.endTime)
+            laneEnds.add(effectiveEndMinutes(event, minDurationMinutes))
             laneIndices.add(mutableListOf())
         }
         laneOf[index] = laneIndex
@@ -646,6 +668,7 @@ fun DayTimeline(
     val hourHeightDp = 60
     val timelineHeightDp = hourHeightDp * 24
     val sessionColor = MaterialTheme.colorScheme.tertiary
+    val minHeightDp = MIN_CARD_HEIGHT_DP
 
     val rawEvents = remember(dayTasks, daySessions, selectedDate, contexts, allTasks, sessionColor) {
         val taskEvents = dayTasks.mapNotNull { task ->
@@ -693,7 +716,7 @@ fun DayTimeline(
         (taskEvents + sessionEvents).sortedBy { it.startTime }
     }
 
-    val layoutEvents = remember(rawEvents) { calculateEventLayouts(rawEvents) }
+    val layoutEvents = remember(rawEvents) { calculateEventLayouts(rawEvents, MIN_CARD_HEIGHT_MINUTES) }
 
     @Suppress("UnusedBoxWithConstraintsScope")
     BoxWithConstraints(
@@ -736,7 +759,6 @@ fun DayTimeline(
             }
 
             val topOffsetDp = (hourHeightDp * startMinutes / 60f)
-            val minHeightDp = 20f
             val maxHeightDp = layoutEvent.slotEndMinutes?.let { slotEnd ->
                 val slotDuration = if (slotEnd > startMinutes) {
                     slotEnd - startMinutes
