@@ -5,6 +5,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -17,8 +18,6 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
@@ -44,8 +43,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.zIndex
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.voodoo.data.ProjectContext
 import com.example.voodoo.data.Task
@@ -70,7 +72,9 @@ import java.time.YearMonth
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.time.format.TextStyle
+import java.time.temporal.ChronoUnit
 import java.util.Locale
+import kotlin.comparisons.compareBy
 
 data class TimelineEvent(
     val startTime: LocalTime,
@@ -80,6 +84,66 @@ data class TimelineEvent(
     val isSession: Boolean,
     val taskId: Long
 )
+
+data class LayoutEvent(
+    val event: TimelineEvent,
+    val column: Int,
+    val totalColumns: Int
+)
+
+fun calculateEventLayouts(events: List<TimelineEvent>): List<LayoutEvent> {
+    if (events.isEmpty()) return emptyList()
+
+    val sorted = events.sortedWith(compareBy({ it.startTime }, { it.endTime }))
+    val allLayouts = mutableListOf<LayoutEvent>()
+
+    var currentCluster = mutableListOf<TimelineEvent>()
+    var clusterEnd = sorted.first().endTime
+
+    for (event in sorted) {
+        if (event.startTime < clusterEnd) {
+            currentCluster.add(event)
+            if (event.endTime > clusterEnd) clusterEnd = event.endTime
+        } else {
+            if (currentCluster.isNotEmpty()) {
+                allLayouts.addAll(processCluster(currentCluster))
+            }
+            currentCluster = mutableListOf(event)
+            clusterEnd = event.endTime
+        }
+    }
+    if (currentCluster.isNotEmpty()) {
+        allLayouts.addAll(processCluster(currentCluster))
+    }
+
+    return allLayouts
+}
+
+private fun processCluster(cluster: List<TimelineEvent>): List<LayoutEvent> {
+    val tempLayouts = mutableListOf<Pair<TimelineEvent, Int>>()
+    val lanes = mutableListOf<LocalTime>()
+
+    for (event in cluster) {
+        var laneIndex = -1
+        for (i in lanes.indices) {
+            if (lanes[i] <= event.startTime) {
+                laneIndex = i
+                lanes[i] = event.endTime
+                break
+            }
+        }
+        if (laneIndex == -1) {
+            laneIndex = lanes.size
+            lanes.add(event.endTime)
+        }
+        tempLayouts.add(event to laneIndex)
+    }
+
+    val totalColumns = lanes.size
+    return tempLayouts.map { (event, laneIndex) ->
+        LayoutEvent(event, laneIndex, totalColumns)
+    }
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -185,7 +249,6 @@ fun CalendarScreen(
                     filteredSessions = filteredSessions,
                     contexts = contexts
                 )
-
                 CalendarViewMode.WEEK -> WeekView(
                     selectedDate = selectedDate,
                     onDateClick = { viewModel.selectDate(it) },
@@ -193,7 +256,6 @@ fun CalendarScreen(
                     filteredSessions = filteredSessions,
                     contexts = contexts
                 )
-
                 CalendarViewMode.DAY -> DayView(
                     selectedDate = selectedDate,
                     filteredTasks = filteredTasks,
@@ -202,8 +264,6 @@ fun CalendarScreen(
                     tasks = tasks,
                     onTaskClick = onTaskClick
                 )
-
-                else -> Unit
             }
         }
     }
@@ -239,7 +299,6 @@ fun MonthView(
     val startMonth = currentMonth.minusMonths(100)
     val endMonth = currentMonth.plusMonths(100)
     val daysOfWeek = remember { daysOfWeek() }
-
     val state = rememberCalendarState(
         startMonth = startMonth,
         endMonth = endMonth,
@@ -255,11 +314,9 @@ fun MonthView(
                     millisToLocalDate(start) == day.date
                 } ?: false
             }
-
             val daySessions = filteredSessions.filter { session ->
                 millisToLocalDate(session.startTime) == day.date
             }
-
             DayCell(
                 day = day,
                 isSelected = day.date == selectedDate,
@@ -290,7 +347,6 @@ fun MonthHeader(
             textAlign = TextAlign.Center,
             color = MaterialTheme.colorScheme.onSurface
         )
-
         Row(modifier = Modifier.fillMaxWidth()) {
             daysOfWeek.forEach { day ->
                 Text(
@@ -339,7 +395,6 @@ fun DayCell(
                 },
                 style = MaterialTheme.typography.bodySmall
             )
-
             Row(
                 modifier = Modifier
                     .weight(1f)
@@ -349,19 +404,14 @@ fun DayCell(
             ) {
                 val allItems: List<Any> = tasks + sessions
                 val visibleItems = allItems.take(3)
-
-                visibleItems.forEach { item ->
+                for (item in visibleItems) {
                     val color = when (item) {
                         is Task -> {
-                            contexts.find { it.id == item.contextId }?.color?.let { Color(it) }
-                                ?: Color.Gray
+                            contexts.find { it.id == item.contextId }?.color?.let { Color(it) } ?: Color.Gray
                         }
-
                         is TimerSession -> MaterialTheme.colorScheme.secondary
-
                         else -> Color.Gray
                     }
-
                     Box(
                         modifier = Modifier
                             .size(4.dp)
@@ -369,7 +419,6 @@ fun DayCell(
                     )
                     Spacer(modifier = Modifier.width(2.dp))
                 }
-
                 if (allItems.size > 3) {
                     Text(
                         text = "+${allItems.size - 3}",
@@ -395,7 +444,6 @@ fun WeekView(
     val startMonth = currentMonth.minusMonths(100)
     val endMonth = currentMonth.plusMonths(100)
     val daysOfWeek = remember { daysOfWeek() }
-
     val state = rememberWeekCalendarState(
         startDate = startMonth.atDay(1),
         endDate = endMonth.atEndOfMonth(),
@@ -411,11 +459,9 @@ fun WeekView(
                     millisToLocalDate(start) == day.date
                 } ?: false
             }
-
             val daySessions = filteredSessions.filter { session ->
                 millisToLocalDate(session.startTime) == day.date
             }
-
             WeekDayCell(
                 day = day,
                 isSelected = day.date == selectedDate,
@@ -433,7 +479,7 @@ fun WeekView(
 
 @Composable
 fun WeekHeader(
-    week: Week,
+    @Suppress("UNUSED_PARAMETER") week: Week,
     daysOfWeek: List<DayOfWeek>
 ) {
     Row(
@@ -483,7 +529,6 @@ fun WeekDayCell(
                 color = MaterialTheme.colorScheme.onSurface,
                 style = MaterialTheme.typography.bodySmall
             )
-
             Row(
                 modifier = Modifier
                     .weight(1f)
@@ -493,19 +538,14 @@ fun WeekDayCell(
             ) {
                 val allItems: List<Any> = tasks + sessions
                 val visibleItems = allItems.take(3)
-
-                visibleItems.forEach { item ->
+                for (item in visibleItems) {
                     val color = when (item) {
                         is Task -> {
-                            contexts.find { it.id == item.contextId }?.color?.let { Color(it) }
-                                ?: Color.Gray
+                            contexts.find { it.id == item.contextId }?.color?.let { Color(it) } ?: Color.Gray
                         }
-
                         is TimerSession -> MaterialTheme.colorScheme.secondary
-
                         else -> Color.Gray
                     }
-
                     Box(
                         modifier = Modifier
                             .size(4.dp)
@@ -513,7 +553,6 @@ fun WeekDayCell(
                     )
                     Spacer(modifier = Modifier.width(2.dp))
                 }
-
                 if (allItems.size > 3) {
                     Text(
                         text = "+${allItems.size - 3}",
@@ -541,7 +580,6 @@ fun DayView(
             millisToLocalDate(start) == selectedDate
         } ?: false
     }
-
     val daySessions = filteredSessions.filter { session ->
         millisToLocalDate(session.startTime) == selectedDate
     }
@@ -556,7 +594,6 @@ fun DayView(
             style = MaterialTheme.typography.titleLarge,
             modifier = Modifier.padding(16.dp)
         )
-
         Box(
             modifier = Modifier
                 .fillMaxSize()
@@ -585,29 +622,25 @@ fun DayTimeline(
     val timelineHeightDp = hourHeightDp * 24
     val sessionColor = MaterialTheme.colorScheme.tertiary
 
-    val events = remember(dayTasks, daySessions, contexts, allTasks, sessionColor) {
+    val rawEvents = remember(dayTasks, daySessions, contexts, allTasks, sessionColor) {
         val taskEvents = dayTasks.mapNotNull { task ->
             task.plannedStart?.let { startMillis ->
                 val startTime = millisToLocalTime(startMillis)
                 val endTime = task.plannedEnd?.let { endMillis ->
                     millisToLocalTime(endMillis)
                 } ?: startTime.plusHours(1)
-
                 TimelineEvent(
                     startTime = startTime,
                     endTime = endTime,
                     title = task.title,
-                    color = contexts.find { it.id == task.contextId }?.color?.let { Color(it) }
-                        ?: Color.Gray,
+                    color = contexts.find { it.id == task.contextId }?.color?.let { Color(it) } ?: Color.Gray,
                     isSession = false,
                     taskId = task.id
                 )
             }
         }
-
         val sessionEvents = daySessions.map { session ->
             val task = allTasks.find { it.id == session.taskId }
-
             TimelineEvent(
                 startTime = millisToLocalTime(session.startTime),
                 endTime = millisToLocalTime(session.endTime),
@@ -617,27 +650,31 @@ fun DayTimeline(
                 taskId = session.taskId
             )
         }
-
         (taskEvents + sessionEvents).sortedBy { it.startTime }
     }
 
-    Box(
+    val layoutEvents = remember(rawEvents) { calculateEventLayouts(rawEvents) }
+
+    @Suppress("UnusedBoxWithConstraintsScope")
+    BoxWithConstraints(
         modifier = Modifier
             .fillMaxWidth()
             .height(timelineHeightDp.dp)
     ) {
+        val leftMargin = 58.dp
+        val rightMargin = 12.dp
+        val availableWidth = (maxWidth - leftMargin - rightMargin).coerceAtLeast(0.dp)
+
         repeat(24) { hour ->
             val topOffsetDp = hourHeightDp * hour
-
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(1.dp)
-                    .padding(start = 56.dp, end = 8.dp)
+                    .padding(start = leftMargin, end = rightMargin)
                     .offset(y = topOffsetDp.dp)
                     .background(MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f))
             )
-
             Text(
                 text = String.format("%02d:00", hour),
                 style = MaterialTheme.typography.bodySmall,
@@ -648,10 +685,30 @@ fun DayTimeline(
             )
         }
 
-        events.forEach { event ->
+        layoutEvents.forEach { layoutEvent ->
+            val event = layoutEvent.event
+            val startMinutes = event.startTime.hour * 60 + event.startTime.minute
+            val rawEndMinutes = event.endTime.hour * 60 + event.endTime.minute
+            val durationMinutes = if (rawEndMinutes > startMinutes) {
+                rawEndMinutes - startMinutes
+            } else {
+                24 * 60 - startMinutes
+            }
+
+            val topOffsetDp = (hourHeightDp * startMinutes / 60f)
+            val eventHeightDp = (hourHeightDp * durationMinutes / 60f).coerceAtLeast(36f)
+
+            val widthFraction = 1f / layoutEvent.totalColumns
+            val columnWidth = availableWidth * widthFraction
+            val xOffset = leftMargin + (columnWidth * layoutEvent.column)
+
             TimelineEventCard(
                 event = event,
-                hourHeightDp = hourHeightDp,
+                topOffsetDp = topOffsetDp.dp,
+                xOffset = xOffset,
+                width = columnWidth,
+                height = eventHeightDp.dp,
+                zIndex = layoutEvent.column.toFloat(),
                 onTaskClick = onTaskClick
             )
         }
@@ -661,172 +718,73 @@ fun DayTimeline(
 @Composable
 fun TimelineEventCard(
     event: TimelineEvent,
-    hourHeightDp: Int,
+    topOffsetDp: Dp,
+    xOffset: Dp,
+    width: Dp,
+    height: Dp,
+    zIndex: Float = 0f,
     onTaskClick: (Long) -> Unit
 ) {
-    val startMinutes = event.startTime.hour * 60 + event.startTime.minute
-    val rawEndMinutes = event.endTime.hour * 60 + event.endTime.minute
-
-    val durationMinutes = if (rawEndMinutes > startMinutes) {
-        rawEndMinutes - startMinutes
-    } else {
-        24 * 60 - startMinutes
-    }
-
-    val topOffsetDp = (hourHeightDp * startMinutes / 60f).toInt()
-    val eventHeightDp = (hourHeightDp * durationMinutes / 60f).toInt().coerceAtLeast(22)
+    val isVeryShort = height < 45.dp
 
     Card(
         modifier = Modifier
-            .fillMaxWidth()
-            .padding(start = 58.dp, end = 12.dp)
-            .height(eventHeightDp.dp)
-            .offset(y = topOffsetDp.dp)
+            .offset(x = xOffset, y = topOffsetDp)
+            .width(width)
+            .height(height)
+            .zIndex(zIndex)
             .clickable { onTaskClick(event.taskId) },
         colors = CardDefaults.cardColors(
-            containerColor = event.color.copy(alpha = 0.28f)
+            containerColor = event.color.copy(alpha = if (isVeryShort) 0.4f else 0.28f)
         ),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+        elevation = CardDefaults.cardElevation(defaultElevation = if (isVeryShort) 4.dp else 2.dp),
+        shape = MaterialTheme.shapes.small
     ) {
         Row(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(6.dp),
-            verticalAlignment = Alignment.Top
+                .padding(horizontal = 6.dp, vertical = if (isVeryShort) 2.dp else 6.dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
             Box(
                 modifier = Modifier
-                    .width(4.dp)
+                    .width(if (isVeryShort) 6.dp else 4.dp)
                     .fillMaxHeight()
                     .background(event.color, MaterialTheme.shapes.small)
             )
 
-            Spacer(modifier = Modifier.width(8.dp))
+            Spacer(modifier = Modifier.width(6.dp))
 
             Column(
-                modifier = Modifier.weight(1f)
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.Center
             ) {
                 Text(
                     text = event.title,
-                    style = MaterialTheme.typography.bodyMedium,
-                    maxLines = 2
+                    style = if (isVeryShort) MaterialTheme.typography.labelMedium else MaterialTheme.typography.bodyMedium,
+                    maxLines = if (isVeryShort) 1 else 2,
+                    overflow = TextOverflow.Ellipsis,
+                    color = MaterialTheme.colorScheme.onSurface
                 )
 
-                Text(
-                    text = "${event.startTime.format(DateTimeFormatter.ofPattern("HH:mm"))} - ${
-                        event.endTime.format(DateTimeFormatter.ofPattern("HH:mm"))
-                    }",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.outline,
-                    maxLines = 1
-                )
-
-                if (event.isSession) {
+                if (!isVeryShort) {
                     Text(
-                        text = "Сессия",
+                        text = "${event.startTime.format(DateTimeFormatter.ofPattern("HH:mm"))} - ${event.endTime.format(DateTimeFormatter.ofPattern("HH:mm"))}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.outline,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+
+                if (event.isSession && !isVeryShort) {
+                    Text(
+                        text = "⏱ Сессия",
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.tertiary,
                         maxLines = 1
                     )
                 }
-            }
-        }
-    }
-}
-
-@Composable
-fun TaskCalendarItem(
-    task: Task,
-    contexts: List<ProjectContext>,
-    onClick: () -> Unit
-) {
-    val context = contexts.find { it.id == task.contextId }
-
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 4.dp)
-            .clickable(onClick = onClick),
-        colors = CardDefaults.cardColors(
-            containerColor = context?.color?.let { Color(it).copy(alpha = 0.2f) }
-                ?: MaterialTheme.colorScheme.surfaceVariant
-        )
-    ) {
-        Row(
-            modifier = Modifier.padding(12.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(12.dp)
-                    .background(context?.color?.let { Color(it) } ?: Color.Gray, CircleShape)
-            )
-
-            Spacer(modifier = Modifier.width(12.dp))
-
-            Column {
-                Text(task.title, style = MaterialTheme.typography.titleMedium)
-
-                task.plannedStart?.let { plannedStart ->
-                    Text(
-                        text = millisToLocalTime(plannedStart).format(
-                            DateTimeFormatter.ofPattern("HH:mm")
-                        ),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.outline
-                    )
-                }
-            }
-        }
-    }
-}
-
-@Composable
-fun SessionCalendarItem(
-    session: TimerSession,
-    tasks: List<Task>,
-    contexts: List<ProjectContext>,
-    onClick: () -> Unit
-) {
-    val task = tasks.find { it.id == session.taskId }
-
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 4.dp)
-            .clickable(onClick = onClick),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.tertiaryContainer
-        )
-    ) {
-        Row(
-            modifier = Modifier.padding(12.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(12.dp)
-                    .background(MaterialTheme.colorScheme.tertiary, CircleShape)
-            )
-
-            Spacer(modifier = Modifier.width(12.dp))
-
-            Column {
-                Text(
-                    text = task?.title ?: "Удаленная задача",
-                    style = MaterialTheme.typography.titleMedium
-                )
-
-                val startTime = millisToLocalTime(session.startTime)
-                val endTime = millisToLocalTime(session.endTime)
-
-                Text(
-                    text = "${startTime.format(DateTimeFormatter.ofPattern("HH:mm"))} - ${
-                        endTime.format(DateTimeFormatter.ofPattern("HH:mm"))
-                    }",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.outline
-                )
             }
         }
     }
@@ -842,4 +800,5 @@ private fun millisToLocalTime(millis: Long): LocalTime {
     return Instant.ofEpochMilli(millis)
         .atZone(ZoneId.systemDefault())
         .toLocalTime()
+        .truncatedTo(ChronoUnit.MINUTES)
 }
