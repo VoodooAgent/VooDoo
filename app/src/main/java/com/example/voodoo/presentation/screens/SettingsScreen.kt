@@ -17,8 +17,13 @@ import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.List
+import androidx.compose.material.icons.automirrored.filled.List
+import androidx.compose.material.icons.filled.DeleteForever
+import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Card
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -35,9 +40,12 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import com.example.voodoo.presentation.MainViewModel
 
@@ -48,9 +56,11 @@ fun SettingsScreen(
     onContextsClick: (() -> Unit)? = null,
     viewModel: MainViewModel
 ) {
-    val settings by viewModel.settings.collectAsState()
+val settings by viewModel.settings.collectAsState()
     val exportResult by viewModel.exportResult.collectAsState()
     val importResult by viewModel.importResult.collectAsState()
+    val deleteResult by viewModel.deleteResult.collectAsState()
+    var showDeleteAllDialog by remember { mutableStateOf(false) }
     val snackbarHostState = remember { SnackbarHostState() }
 
     val exportLauncher = rememberLauncherForActivityResult(
@@ -65,7 +75,7 @@ fun SettingsScreen(
         uri?.let { viewModel.importData(it) }
     }
 
-    LaunchedEffect(exportResult, importResult) {
+    LaunchedEffect(exportResult, importResult, deleteResult) {
         exportResult?.let {
             snackbarHostState.showSnackbar(it)
             viewModel.clearExportResult()
@@ -73,6 +83,10 @@ fun SettingsScreen(
         importResult?.let {
             snackbarHostState.showSnackbar(it)
             viewModel.clearImportResult()
+        }
+        deleteResult?.let {
+            snackbarHostState.showSnackbar(it)
+            viewModel.clearDeleteResult()
         }
     }
 
@@ -88,7 +102,7 @@ fun SettingsScreen(
                 actions = {
                     if (onContextsClick != null) {
                         IconButton(onClick = onContextsClick) {
-                            Icon(Icons.Default.List, contentDescription = "Управление контекстами")
+                            Icon(Icons.AutoMirrored.Filled.List, contentDescription = "Управление контекстами")
                         }
                     }
                 }
@@ -254,7 +268,7 @@ fun SettingsScreen(
                     onClick = onContextsClick,
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    Icon(Icons.Default.List, contentDescription = null)
+                    Icon(Icons.AutoMirrored.Filled.List, contentDescription = null)
                     Spacer(modifier = Modifier.width(8.dp))
                     Text("Управление контекстами")
                 }
@@ -285,6 +299,84 @@ fun SettingsScreen(
             ) {
                 Text("Импорт из CSV")
             }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // Кнопка "Удалить ВСЁ"
+            Card(modifier = Modifier.fillMaxWidth()) {
+                Button(
+                    onClick = { showDeleteAllDialog = true },
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.error
+                    )
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.DeleteForever,
+                        contentDescription = null,
+                        modifier = Modifier.padding(end = 8.dp)
+                    )
+                    Text("Удалить ВСЁ", color = Color.White)
+                }
+            }
         }
     }
+
+    // Диалог подтверждения удаления
+    if (showDeleteAllDialog) {
+        DeleteAllConfirmDialog(
+            onConfirm = {
+                showDeleteAllDialog = false
+                viewModel.deleteAllData()
+            },
+            onDismiss = {
+                showDeleteAllDialog = false
+            }
+        )
+    }
+}
+
+@Composable
+fun DeleteAllConfirmDialog(
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Text(
+                text = "Удалить ВСЁ",
+                style = MaterialTheme.typography.headlineSmall,
+                color = MaterialTheme.colorScheme.error
+            )
+        },
+        text = {
+            Text(
+                text = "Вы уверены что хотите удалить все задачи и сессии из базы данных?\n\nЭто действие нельзя отменить!",
+                style = MaterialTheme.typography.bodyLarge
+            )
+        },
+        confirmButton = {
+            Button(
+                onClick = onConfirm,
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.error
+                )
+            ) {
+                Text("Да", color = Color.White)
+            }
+        },
+        dismissButton = {
+            OutlinedButton(onClick = onDismiss) {
+                Text("Отменить")
+            }
+        },
+        icon = {
+            Icon(
+                imageVector = Icons.Default.Warning,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.error
+            )
+        }
+    )
 }
