@@ -3,11 +3,13 @@ package com.example.voodoo.presentation
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.voodoo.VooDooApp
 import com.example.voodoo.data.AppDatabase
 import com.example.voodoo.data.ProjectContext
 import com.example.voodoo.data.Task
 import com.example.voodoo.data.TaskWithChildren
 import com.example.voodoo.data.TimerSession
+import com.example.voodoo.service.ReminderScheduler
 import com.example.voodoo.util.RebalanceRequiredException
 import com.example.voodoo.util.SortOrderManager
 import kotlinx.coroutines.Dispatchers
@@ -97,6 +99,11 @@ class TaskListViewModel(application: Application) : AndroidViewModel(application
     fun updateTask(task: Task) {
         viewModelScope.launch {
             taskDao.update(task)
+            if (task.reminderMinutesBefore != null && task.plannedStart != null) {
+                ReminderScheduler.scheduleReminder(getApplication(), task)
+            } else {
+                ReminderScheduler.cancelReminder(getApplication(), task.id)
+            }
         }
     }
 

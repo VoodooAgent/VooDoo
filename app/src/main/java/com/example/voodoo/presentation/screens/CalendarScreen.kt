@@ -35,6 +35,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -42,6 +43,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.RectangleShape
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
@@ -639,10 +641,12 @@ fun DayView(
             style = MaterialTheme.typography.titleLarge,
             modifier = Modifier.padding(16.dp)
         )
+        val scrollState = rememberScrollState()
+        val density = LocalDensity.current
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .verticalScroll(rememberScrollState())
+                .verticalScroll(scrollState)
         ) {
             DayTimeline(
                 dayTasks = dayTasks,
@@ -652,6 +656,16 @@ fun DayView(
                 allTasks = tasks,
                 onTaskClick = onTaskClick
             )
+        }
+
+        LaunchedEffect(selectedDate) {
+            val now = LocalTime.now()
+            val minutesSinceMidnight = now.hour * 60 + now.minute
+            val hourHeightPx = with(density) { 60.dp.toPx() }
+            val offsetPx = hourHeightPx * minutesSinceMidnight / 60f
+            val viewHeightPx = hourHeightPx * 24
+            val scrollTarget = (offsetPx - viewHeightPx / 3f).coerceAtLeast(0f)
+            scrollState.scrollTo(scrollTarget.toInt())
         }
     }
 }

@@ -4,6 +4,8 @@ import android.app.Application
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.content.Context
+import android.media.AudioAttributes
+import android.media.RingtoneManager
 import android.os.Build
 import com.example.voodoo.data.AppDatabase
 import com.example.voodoo.service.TimerServiceManager
@@ -39,6 +41,13 @@ class VooDooApp : Application() {
                 NotificationManager.IMPORTANCE_HIGH
             ).apply {
                 description = "Напоминания о запланированных задачах"
+                setSound(
+                    RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION),
+                    AudioAttributes.Builder()
+                        .setUsage(AudioAttributes.USAGE_NOTIFICATION)
+                        .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                        .build()
+                )
             }
             notificationManager.createNotificationChannel(reminderChannel)
 

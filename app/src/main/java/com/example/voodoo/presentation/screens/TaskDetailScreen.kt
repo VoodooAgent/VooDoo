@@ -3,6 +3,7 @@ package com.example.voodoo.presentation.screens
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -11,6 +12,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.voodoo.data.TimerSession
@@ -43,16 +45,20 @@ fun TaskDetailScreen(
     var result by remember { mutableStateOf("") }
     var plannedStart by remember { mutableStateOf<Long?>(null) }
     var plannedEnd by remember { mutableStateOf<Long?>(null) }
+    var deadline by remember { mutableStateOf<Long?>(null) }
     var reminderMinutes by remember { mutableStateOf<Int?>(null) }
     var isInitialized by remember { mutableStateOf(false) }
     var showStartDatePicker by remember { mutableStateOf(false) }
     var showEndDatePicker by remember { mutableStateOf(false) }
     var showStartTimePicker by remember { mutableStateOf(false) }
     var showEndTimePicker by remember { mutableStateOf(false) }
+    var showDeadlineDatePicker by remember { mutableStateOf(false) }
+    var showDeadlineTimePicker by remember { mutableStateOf(false) }
     var showContextDialog by remember { mutableStateOf(false) }
     var showParentDialog by remember { mutableStateOf(false) }
     var pendingStartDate by remember { mutableStateOf<Long?>(null) }
     var pendingEndDate by remember { mutableStateOf<Long?>(null) }
+    var pendingDeadlineDate by remember { mutableStateOf<Long?>(null) }
 
     // Состояние для диалога сессии
     var sessionDialogData by remember { mutableStateOf<SessionDialogData?>(null) }
@@ -65,6 +71,7 @@ fun TaskDetailScreen(
                 result = t.result
                 plannedStart = t.plannedStart
                 plannedEnd = t.plannedEnd
+                deadline = t.deadline
                 reminderMinutes = t.reminderMinutesBefore
                 isInitialized = true
             }
@@ -80,6 +87,7 @@ fun TaskDetailScreen(
                     result = result,
                     plannedStart = plannedStart,
                     plannedEnd = plannedEnd,
+                    deadline = deadline,
                     reminderMinutesBefore = reminderMinutes
                 )
             )
@@ -226,28 +234,62 @@ fun TaskDetailScreen(
                         }
 
                         if (plannedStart != null) {
-                            Spacer(modifier = Modifier.height(16.dp))
-                            Text(
-                                "Напоминание: ${reminderMinutes?.let { formatReminder(it) } ?: "выключено"}",
-                                style = MaterialTheme.typography.labelMedium
-                            )
-                            Slider(
-                                value = (reminderMinutes ?: 0).toFloat(),
-                                onValueChange = {
-                                    reminderMinutes = if (it <= 0f) null else it.toInt()
-                                },
-                                valueRange = 0f..1440f,
-                                modifier = Modifier.fillMaxWidth()
-                            )
+                            Spacer(modifier = Modifier.height(12.dp))
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Text("Выкл", style = MaterialTheme.typography.labelSmall)
-                                Text("5 мин", style = MaterialTheme.typography.labelSmall)
-                                Text("1 час", style = MaterialTheme.typography.labelSmall)
-                                Text("24 ч", style = MaterialTheme.typography.labelSmall)
+                                Switch(
+                                    checked = reminderMinutes != null,
+                                    onCheckedChange = { enabled ->
+                                        reminderMinutes = if (enabled) 5 else null
+                                    }
+                                )
+
+                                if (reminderMinutes != null) {
+                                    Text("За")
+
+                                    OutlinedTextField(
+                                        value = (reminderMinutes ?: 5).toString(),
+                                        onValueChange = { value ->
+                                            val parsed = value.filter { it.isDigit() }.take(4).toIntOrNull()
+                                            if (parsed != null) {
+                                                reminderMinutes = parsed.coerceAtMost(1440)
+                                            }
+                                        },
+                                        modifier = Modifier.width(72.dp),
+                                        singleLine = true,
+                                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
+                                    )
+
+                                    Text("мин", modifier = Modifier.padding(end = 4.dp))
+
+                                    OutlinedButton(
+                                        onClick = {
+                                            val current = reminderMinutes ?: 5
+                                            reminderMinutes = (current + 5).coerceAtMost(1440)
+                                        },
+                                        contentPadding = ButtonDefaults.TextButtonContentPadding
+                                    ) {
+                                        Text("+5")
+                                    }
+                                } else {
+                                    Text("Напоминание выключено", color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f))
+                                }
                             }
+                        }
+
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Text("Дедлайн:", style = MaterialTheme.typography.labelMedium)
+                        Spacer(modifier = Modifier.height(4.dp))
+                        OutlinedButton(
+                            onClick = { showDeadlineDatePicker = true },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Icon(Icons.Default.Event, contentDescription = null)
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(deadline?.let { detailViewModel.formatDateTime(it) } ?: "Не задано")
                         }
                     }
                 }
@@ -538,6 +580,56 @@ fun TaskDetailScreen(
             text = { TimePicker(state = timePickerState) }
         )
     }
+
+    // DatePicker дедлайна
+    if (showDeadlineDatePicker) {
+        val datePickerState = rememberDatePickerState(
+            initialSelectedDateMillis = deadline ?: plannedStart ?: System.currentTimeMillis()
+        )
+        DatePickerDialog(
+            onDismissRequest = { showDeadlineDatePicker = false },
+            confirmButton = {
+                TextButton(onClick = {
+                    datePickerState.selectedDateMillis?.let { date ->
+                        pendingDeadlineDate = date
+                        showDeadlineDatePicker = false
+                        showDeadlineTimePicker = true
+                    }
+                }) { Text("OK") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDeadlineDatePicker = false }) { Text("Отмена") }
+            }
+        ) {
+            DatePicker(state = datePickerState)
+        }
+    }
+
+    // TimePicker дедлайна
+    if (showDeadlineTimePicker) {
+        val timePickerState = rememberTimePickerState(
+            initialHour = deadline?.let { Calendar.getInstance().apply { timeInMillis = it }.get(Calendar.HOUR_OF_DAY) } ?: 12,
+            initialMinute = deadline?.let { Calendar.getInstance().apply { timeInMillis = it }.get(Calendar.MINUTE) } ?: 0
+        )
+        AlertDialog(
+            onDismissRequest = { showDeadlineTimePicker = false },
+            confirmButton = {
+                TextButton(onClick = {
+                    pendingDeadlineDate?.let { date ->
+                        val cal = Calendar.getInstance().apply { timeInMillis = date }
+                        cal.set(Calendar.HOUR_OF_DAY, timePickerState.hour)
+                        cal.set(Calendar.MINUTE, timePickerState.minute)
+                        deadline = cal.timeInMillis
+                    }
+                    showDeadlineTimePicker = false
+                }) { Text("OK") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDeadlineTimePicker = false }) { Text("Отмена") }
+            },
+            text = { TimePicker(state = timePickerState) }
+        )
+    }
 }
 
 // ============ ДИАЛОГ РЕДАКТИРОВАНИЯ СЕССИИ ============
@@ -778,13 +870,5 @@ private fun SessionEditDialog(
             },
             text = { TimePicker(state = timePickerState) }
         )
-    }
-}
-
-private fun formatReminder(minutes: Int): String {
-    return when {
-        minutes < 60 -> "$minutes мин"
-        minutes < 1440 -> "${minutes / 60} ч ${minutes % 60} мин"
-        else -> "${minutes / 1440} дн ${(minutes % 1440) / 60} ч"
     }
 }

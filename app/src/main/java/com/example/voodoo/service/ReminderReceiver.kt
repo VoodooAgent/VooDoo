@@ -1,5 +1,6 @@
 package com.example.voodoo.service
 
+import android.app.Notification
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.BroadcastReceiver
@@ -42,6 +43,7 @@ class ReminderReceiver : BroadcastReceiver() {
             .setContentTitle("Напоминание: $title")
             .setContentText("Время начать работу над задачей")
             .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setDefaults(Notification.DEFAULT_SOUND or Notification.DEFAULT_VIBRATE)
             .setAutoCancel(true)
             .setContentIntent(pendingIntent)
             .build()

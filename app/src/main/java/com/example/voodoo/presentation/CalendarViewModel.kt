@@ -34,7 +34,7 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
     private val _selectedDate = MutableStateFlow(LocalDate.now())
     val selectedDate: StateFlow<LocalDate> = _selectedDate.asStateFlow()
 
-    private val _viewMode = MutableStateFlow(CalendarViewMode.MONTH)
+    private val _viewMode = MutableStateFlow(CalendarViewMode.DAY)
     val viewMode: StateFlow<CalendarViewMode> = _viewMode.asStateFlow()
 
     init {
