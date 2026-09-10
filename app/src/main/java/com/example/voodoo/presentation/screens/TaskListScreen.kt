@@ -112,12 +112,10 @@ private fun startOfYear(): Long {
 
 private fun flattenTree(tree: List<TaskWithChildren>): List<Pair<Task, Int>> {
     val result = mutableListOf<Pair<Task, Int>>()
-
     fun traverse(node: TaskWithChildren, level: Int) {
         result.add(node.task to level)
         node.children.forEach { traverse(it, level + 1) }
     }
-
     tree.forEach { traverse(it, 0) }
     return result
 }
@@ -141,15 +139,12 @@ fun TaskListScreen(
     val expandedIds by taskListViewModel.expandedTaskIds.collectAsState()
     val settings by mainViewModel.settings.collectAsState()
     val durations by taskListViewModel.taskDurations.collectAsState()
-
     val pendingCompletionTask by taskListViewModel.pendingCompletionTask.collectAsState()
 
     var showCreateDialog by remember { mutableStateOf(false) }
     var showSwipeMenu by remember { mutableStateOf<Task?>(null) }
     var createParentId by remember { mutableStateOf<Long?>(null) }
-
     var completedSubtasks by remember { mutableStateOf<List<Task>>(emptyList()) }
-
     var completedExpanded by remember(contextId) { mutableStateOf(false) }
     var expandedPeriods by remember(contextId) { mutableStateOf<Set<String>>(emptySet()) }
 
@@ -158,7 +153,6 @@ fun TaskListScreen(
     }
 
     val currentContext = contexts.find { it.id == contextId }
-
     val displayName = if (contextId == null) {
         settings.noContextName
     } else {
@@ -183,8 +177,8 @@ fun TaskListScreen(
         val filtered = tasks.filter { !it.isDone }
         when (settings.taskSortMode) {
             "created_at" -> filtered.sortedByDescending { it.createdAt }
-            "planned_start" -> filtered.sortedByDescending { it.plannedStart ?: 0L }
-            "deadline" -> filtered.sortedByDescending { it.deadline ?: 0L }
+            "planned_start" -> filtered.sortedBy { it.plannedStart ?: Long.MAX_VALUE }
+            "deadline" -> filtered.sortedBy { it.deadline ?: Long.MAX_VALUE }
             else -> filtered.sortedBy { it.sortOrder }
         }
     }
@@ -416,14 +410,14 @@ fun TaskListScreen(
             },
             onICalClick = { },
             onEditClick = { onTaskClick(task.id) },
-            onMoveUpClick = if (settings.taskSortMode == "manual") {{
+            onMoveUpClick = if (settings.taskSortMode == "manual") { {
                 taskListViewModel.moveTaskUp(task)
                 showSwipeMenu = null
-            }} else null,
-            onMoveDownClick = if (settings.taskSortMode == "manual") {{
+            } } else null,
+            onMoveDownClick = if (settings.taskSortMode == "manual") { {
                 taskListViewModel.moveTaskDown(task)
                 showSwipeMenu = null
-            }} else null,
+            } } else null,
             onDeleteClick = {
                 taskListViewModel.deleteTask(task)
                 showSwipeMenu = null
@@ -508,7 +502,6 @@ fun TaskTreeItem(
                     modifier = Modifier.width(2.dp).fillMaxHeight().background(MaterialTheme.colorScheme.outlineVariant)
                 )
                 Spacer(modifier = Modifier.width(4.dp))
-
                 Column(modifier = Modifier.weight(1f)) {
                     children.forEach { child ->
                         TaskTreeItem(
@@ -615,7 +608,6 @@ private fun LazyListScope.doneTreeItems(
             if (level > 0) {
                 Spacer(modifier = Modifier.width((level * 20).dp))
             }
-
             Box(modifier = Modifier.weight(1f)) {
                 TaskCard(
                     task = task,
@@ -647,7 +639,6 @@ private fun LazyListScope.collapsiblePeriod(
     onSwipeMenuRequest: (Task) -> Unit
 ) {
     if (list.isEmpty()) return
-
     val expanded = periodKey in expandedPeriods
 
     item(key = "header_$periodKey") {

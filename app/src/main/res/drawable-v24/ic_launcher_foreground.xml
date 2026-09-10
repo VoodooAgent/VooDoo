@@ -8,107 +8,125 @@
     <!-- Концентрические круги (волны) вокруг календаря -->
     <path
         android:fillColor="#00000000"
-        android:pathData="M54,27 A27,27 0 1,1 54,81 A27,27 0 1,1 54,27z"
-        android:strokeWidth="1.2"
+        android:pathData="M54,30 A24,24 0 1,1 54,78 A24,24 0 1,1 54,30z"
+        android:strokeWidth="1"
         android:strokeColor="#66BB6A"
-        android:strokeAlpha="0.4" />
+        android:strokeAlpha="0.35" />
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M54,26 A28,28 0 1,1 54,82 A28,28 0 1,1 54,26z"
+        android:strokeWidth="0.8"
+        android:strokeColor="#66BB6A"
+        android:strokeAlpha="0.2" />
     <path
         android:fillColor="#00000000"
         android:pathData="M54,22 A32,32 0 1,1 54,86 A32,32 0 1,1 54,22z"
-        android:strokeWidth="1"
+        android:strokeWidth="0.6"
         android:strokeColor="#66BB6A"
-        android:strokeAlpha="0.25" />
-    <path
-        android:fillColor="#00000000"
-        android:pathData="M54,17 A37,37 0 1,1 54,91 A37,37 0 1,1 54,17z"
-        android:strokeWidth="0.8"
-        android:strokeColor="#66BB6A"
-        android:strokeAlpha="0.15" />
+        android:strokeAlpha="0.12" />
 
-    <!-- Тень под календарём -->
+    <!-- Тень под плиткой календаря -->
     <path
-        android:fillColor="#0A1F10"
-        android:pathData="M30,40 L78,40 L78,80 Q78,85 73,85 L35,85 Q30,85 30,80z"
-        android:fillAlpha="0.6" />
+        android:fillColor="#0F2A18"
+        android:pathData="M26,38 L82,38 L82,82 Q82,88 76,88 L32,88 Q26,88 26,82z"
+        android:fillAlpha="0.5" />
 
-    <!-- Календарь основная часть (светло-жёлтый) -->
+    <!-- Календарь — светло-жёлтая плитка с закруглёнными углами -->
     <path
         android:fillColor="#FFF8E1"
-        android:pathData="M28,36 L80,36 L80,78 Q80,82 76,82 L32,82 Q28,82 28,78z" />
+        android:pathData="M24,36 L84,36 L84,80 Q84,86 78,86 L30,86 Q24,86 24,80z" />
 
-    <!-- Переплёт посередине -->
+    <!-- Линия переплёта (две страницы) -->
     <path
         android:fillColor="#00000000"
-        android:pathData="M54,36 L54,82"
-        android:strokeWidth="0.8"
-        android:strokeColor="#E0D5B0" />
+        android:pathData="M54,36 L54,86"
+        android:strokeWidth="0.6"
+        android:strokeColor="#E8DCC0" />
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M56,36 L56,86"
+        android:strokeWidth="0.3"
+        android:strokeColor="#E8DCC0" />
 
     <!-- Два кольца сверху календаря (слева) -->
     <path
         android:fillColor="#00000000"
-        android:pathData="M34,32 A4,6 0 0,1 34,20 A6,6 0 0,1 40,20 A4,6 0 0,1 40,32"
-        android:strokeWidth="2.5"
+        android:pathData="M33,33 A3.5,5 0 0,1 33,22 A5,5 0 0,1 38.5,22 A3.5,5 0 0,1 38.5,33"
+        android:strokeWidth="2.2"
         android:strokeColor="#FFF8E1"
         android:strokeLineCap="round" />
     <path
         android:fillColor="#00000000"
-        android:pathData="M38,32 A4,6 0 0,1 38,20 A6,6 0 0,1 44,20 A4,6 0 0,1 44,32"
-        android:strokeWidth="2.5"
+        android:pathData="M36.5,33 A3.5,5 0 0,1 36.5,22 A5,5 0 0,1 42,22 A3.5,5 0 0,1 42,33"
+        android:strokeWidth="2.2"
         android:strokeColor="#FFE082"
         android:strokeLineCap="round" />
 
     <!-- Два кольца сверху календаря (справа) -->
     <path
         android:fillColor="#00000000"
-        android:pathData="M64,32 A4,6 0 0,1 64,20 A6,6 0 0,1 70,20 A4,6 0 0,1 70,32"
-        android:strokeWidth="2.5"
+        android:pathData="M66,33 A3.5,5 0 0,1 66,22 A5,5 0 0,1 71.5,22 A3.5,5 0 0,1 71.5,33"
+        android:strokeWidth="2.2"
         android:strokeColor="#FFF8E1"
         android:strokeLineCap="round" />
     <path
         android:fillColor="#00000000"
-        android:pathData="M68,32 A4,6 0 0,1 68,20 A6,6 0 0,1 74,20 A4,6 0 0,1 74,32"
-        android:strokeWidth="2.5"
+        android:pathData="M69.5,33 A3.5,5 0 0,1 69.5,22 A5,5 0 0,1 75,22 A3.5,5 0 0,1 75,33"
+        android:strokeWidth="2.2"
         android:strokeColor="#FFE082"
         android:strokeLineCap="round" />
 
-    <!-- Линии календаря (сетка) -->
+    <!-- Сетка календаря (горизонтальные линии) -->
     <path
         android:fillColor="#00000000"
-        android:pathData="M32,48 L76,48"
-        android:strokeWidth="1"
-        android:strokeColor="#E0D5B0" />
+        android:pathData="M28,47 L80,47"
+        android:strokeWidth="0.8"
+        android:strokeColor="#E8DCC0" />
     <path
         android:fillColor="#00000000"
-        android:pathData="M32,60 L76,60"
-        android:strokeWidth="1"
-        android:strokeColor="#E0D5B0" />
+        android:pathData="M28,58 L80,58"
+        android:strokeWidth="0.8"
+        android:strokeColor="#E8DCC0" />
     <path
         android:fillColor="#00000000"
-        android:pathData="M32,72 L76,72"
-        android:strokeWidth="1"
-        android:strokeColor="#E0D5B0" />
+        android:pathData="M28,69 L80,69"
+        android:strokeWidth="0.8"
+        android:strokeColor="#E8DCC0" />
 
-    <!-- Свечение галочки -->
+    <!-- Сетка календаря (вертикальные линии) -->
     <path
         android:fillColor="#00000000"
-        android:pathData="M40,59 L49,69 L65,48"
-        android:strokeWidth="7"
+        android:pathData="M40,47 L40,80"
+        android:strokeWidth="0.4"
+        android:strokeColor="#E8DCC0" />
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M68,47 L68,80"
+        android:strokeWidth="0.4"
+        android:strokeColor="#E8DCC0" />
+
+    <!-- Внешнее свечение галочки (тёмный ореол) -->
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M38,58 L49,71 L68,45"
+        android:strokeWidth="8"
+        android:strokeColor="#1B5E20"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:strokeAlpha="0.4" />
+    <!-- Среднее свечение -->
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M38,58 L49,71 L68,45"
+        android:strokeWidth="5"
         android:strokeColor="#2E7D32"
         android:strokeLineCap="round"
         android:strokeLineJoin="round"
-        android:strokeAlpha="0.3" />
-    <path
-        android:fillColor="#00000000"
-        android:pathData="M40,59 L49,69 L65,48"
-        android:strokeWidth="5"
-        android:strokeColor="#43A047"
-        android:strokeLineCap="round"
-        android:strokeLineJoin="round"
         android:strokeAlpha="0.5" />
-    <!-- Галочка -->
+    <!-- Яркая зелёная галочка (выполненная задача) -->
     <path
         android:fillColor="#00000000"
-        android:pathData="M40,59 L49,69 L65,48"
+        android:pathData="M38,58 L49,71 L68,45"
         android:strokeWidth="3.5"
         android:strokeColor="#00E676"
         android:strokeLineCap="round"

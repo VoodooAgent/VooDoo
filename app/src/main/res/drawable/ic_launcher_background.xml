@@ -4,13 +4,14 @@
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
-    <!-- Тёмно-зелёный фон -->
     <path
         android:fillColor="#1B4028"
-        android:pathData="M0,0h108v108h-108z" />
-    <!-- Свечение/тень под календарём -->
+        android:pathData="M0,0h108v108H0z" />
+    <!-- Текстурные точки -->
     <path
-        android:fillColor="#0D2E1A"
-        android:pathData="M20,44 L88,44 L88,88 Q88,94 82,94 L26,94 Q20,94 20,88z"
-        android:fillAlpha="0.5" />
+        android:fillColor="#264D32"
+        android:pathData="M8,8h2v2H8zM24,12h2v2H24zM40,6h2v2H40zM68,10h2v2H68zM88,4h2v2H88zM96,24h2v2H96zM6,40h2v2H6zM98,50h2v2H98zM4,68h2v2H4zM12,88h2v2H12zM90,80h2v2H90zM50,96h2v2H50zM76,92h2v2H76zM30,98h2v2H30z" />
+    <path
+        android:fillColor="#2A5535"
+        android:pathData="M16,20h1.5v1.5H16zM56,16h1.5v1.5H56zM80,22h1.5v1.5H80zM10,56h1.5v1.5H10zM92,60h1.5v1.5H92zM20,76h1.5v1.5H20zM70,84h1.5v1.5H70zM44,88h1.5v1.5H44z" />
 </vector>
