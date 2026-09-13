@@ -133,6 +133,7 @@ fun TaskListScreen(
     onRoutineClick: () -> Unit,
     onActiveTimerClick: () -> Unit,
     onCalendarClick: () -> Unit,
+    onContextDetailClick: () -> Unit = {},
     taskListViewModel: TaskListViewModel = viewModel(),
     mainViewModel: MainViewModel = viewModel()
 ) {
@@ -215,7 +216,10 @@ fun TaskListScreen(
             TopAppBar(
                 title = {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(displayName)
+                        Text(
+                            text = displayName,
+                            modifier = Modifier.clickable(onClick = onContextDetailClick)
+                        )
                         Spacer(modifier = Modifier.width(4.dp))
                         IconButton(
                             onClick = { taskListViewModel.toggleExpandAll() },

@@ -140,7 +140,11 @@ fun VooDooNavHost(viewModel: MainViewModel) {
                 onPriorityClick = { navController.navigate("priority") },
                 onRoutineClick = { navController.navigate("routine") },
                 onActiveTimerClick = { navController.navigate("active_timer") },
-                onCalendarClick = { navController.navigate("calendar") }
+                onCalendarClick = { navController.navigate("calendar") },
+                onContextDetailClick = {
+                    val route = if (contextId != null) "context_detail/$contextId" else "context_detail_no"
+                    navController.navigate(route)
+                }
             )
         }
         composable("context_no") {
@@ -152,7 +156,49 @@ fun VooDooNavHost(viewModel: MainViewModel) {
                 onPriorityClick = { navController.navigate("priority") },
                 onRoutineClick = { navController.navigate("routine") },
                 onActiveTimerClick = { navController.navigate("active_timer") },
-                onCalendarClick = { navController.navigate("calendar") }
+                onCalendarClick = { navController.navigate("calendar") },
+                onContextDetailClick = { navController.navigate("context_detail_no") }
+            )
+        }
+        composable(
+            route = "context_detail/{contextId}",
+            arguments = listOf(navArgument("contextId") { type = NavType.LongType })
+        ) { backStackEntry ->
+            val contextId = backStackEntry.arguments?.getLong("contextId")
+            ContextDetailScreen(
+                contextId = contextId,
+                contextName = "Контекст",
+                onBackClick = { navController.popBackStack() },
+                onDeadlineListClick = {
+                    val route = if (contextId != null) "context_deadline/$contextId" else "context_deadline_no"
+                    navController.navigate(route)
+                }
+            )
+        }
+        composable("context_detail_no") {
+            ContextDetailScreen(
+                contextId = null,
+                contextName = "Без контекста",
+                onBackClick = { navController.popBackStack() },
+                onDeadlineListClick = { navController.navigate("context_deadline_no") }
+            )
+        }
+        composable(
+            route = "context_deadline/{contextId}",
+            arguments = listOf(navArgument("contextId") { type = NavType.LongType })
+        ) { backStackEntry ->
+            val contextId = backStackEntry.arguments?.getLong("contextId")
+            ContextDeadlineScreen(
+                contextId = contextId,
+                onBackClick = { navController.popBackStack() },
+                onTaskClick = { taskId -> navController.navigate("task/$taskId") }
+            )
+        }
+        composable("context_deadline_no") {
+            ContextDeadlineScreen(
+                contextId = null,
+                onBackClick = { navController.popBackStack() },
+                onTaskClick = { taskId -> navController.navigate("task/$taskId") }
             )
         }
         composable("settings") {

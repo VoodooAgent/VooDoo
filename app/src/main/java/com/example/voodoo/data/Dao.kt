@@ -82,6 +82,12 @@ interface TaskDao {
     @Query("SELECT * FROM tasks WHERE plannedStart IS NOT NULL AND plannedEnd IS NOT NULL")
     suspend fun getPlannedTasks(): List<Task>
 
+    @Query("SELECT * FROM tasks WHERE contextId = :contextId AND isDone = 0 AND deadline IS NOT NULL ORDER BY deadline ASC, sortOrder ASC")
+    fun getTasksWithDeadlineByContext(contextId: Long): Flow<List<Task>>
+
+    @Query("SELECT * FROM tasks WHERE contextId IS NULL AND isDone = 0 AND deadline IS NOT NULL ORDER BY deadline ASC, sortOrder ASC")
+    fun getTasksWithDeadlineWithoutContext(): Flow<List<Task>>
+
     @Insert
     suspend fun insert(task: Task): Long
 

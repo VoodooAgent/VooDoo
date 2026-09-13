@@ -182,7 +182,7 @@ private fun ContextItem(
 }
 
 @Composable
-private fun ContextEditDialog(
+fun ContextEditDialog(
     context: ProjectContext?,
     onDismiss: () -> Unit,
     onSave: (String, Long) -> Unit

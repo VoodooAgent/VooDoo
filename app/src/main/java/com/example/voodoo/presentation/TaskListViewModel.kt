@@ -491,4 +491,12 @@ class TaskListViewModel(application: Application) : AndroidViewModel(application
 
         return roots.map { buildNode(it) }
     }
+
+    fun getTasksWithDeadlineByContext(contextId: Long): Flow<List<Task>> {
+        return taskDao.getTasksWithDeadlineByContext(contextId)
+    }
+
+    fun getTasksWithDeadlineWithoutContext(): Flow<List<Task>> {
+        return taskDao.getTasksWithDeadlineWithoutContext()
+    }
 }
