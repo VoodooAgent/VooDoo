@@ -82,6 +82,9 @@ class TaskListViewModel(application: Application) : AndroidViewModel(application
         }
         .stateIn(viewModelScope, SharingStarted.Lazily, emptySet())
 
+    val allSessions: StateFlow<List<TimerSession>> = sessionDao.getAllSessions()
+        .stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
+
     fun selectContext(contextId: Long?) {
         _selectedContextId.value = contextId
     }

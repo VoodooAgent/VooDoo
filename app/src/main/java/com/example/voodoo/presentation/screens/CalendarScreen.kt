@@ -300,14 +300,16 @@ fun CalendarScreen(
                     onDateClick = { viewModel.selectDate(it) },
                     filteredTasks = filteredTasks,
                     filteredSessions = filteredSessions,
-                    contexts = contexts
+                    contexts = contexts,
+                    routineMarkers = { date -> viewModel.getRoutineMarkers(date, tasks, sessions) }
                 )
                 CalendarViewMode.WEEK -> WeekView(
                     selectedDate = selectedDate,
                     onDateClick = { viewModel.selectDate(it) },
                     filteredTasks = filteredTasks,
                     filteredSessions = filteredSessions,
-                    contexts = contexts
+                    contexts = contexts,
+                    routineMarkers = { date -> viewModel.getRoutineMarkers(date, tasks, sessions) }
                 )
                 CalendarViewMode.DAY -> DayView(
                     selectedDate = selectedDate,
@@ -347,7 +349,8 @@ fun MonthView(
     onDateClick: (LocalDate) -> Unit,
     filteredTasks: List<Task>,
     filteredSessions: List<TimerSession>,
-    contexts: List<ProjectContext>
+    contexts: List<ProjectContext>,
+    routineMarkers: (LocalDate) -> Map<Long, Boolean> = { emptyMap() }
 ) {
     val currentMonth = remember(selectedDate) { YearMonth.from(selectedDate) }
     val startMonth = currentMonth.minusMonths(100)
@@ -379,6 +382,7 @@ fun MonthView(
                 tasks = dayTasks,
                 sessions = daySessions,
                 contexts = contexts,
+                routineMarkers = routineMarkers(day.date),
                 onClick = { onDateClick(day.date) }
             )
         },
@@ -424,6 +428,7 @@ fun DayCell(
     tasks: List<Task>,
     sessions: List<TimerSession>,
     contexts: List<ProjectContext>,
+    routineMarkers: Map<Long, Boolean> = emptyMap(),
     onClick: () -> Unit
 ) {
     Box(
@@ -484,6 +489,19 @@ fun DayCell(
                     )
                 }
             }
+            if (routineMarkers.isNotEmpty()) {
+                Row(
+                    horizontalArrangement = Arrangement.Center,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    routineMarkers.forEach { (_, done) ->
+                        Text(
+                            text = if (done) "✅" else "❌",
+                            fontSize = 7.sp
+                        )
+                    }
+                }
+            }
         }
     }
 }
@@ -494,7 +512,8 @@ fun WeekView(
     onDateClick: (LocalDate) -> Unit,
     filteredTasks: List<Task>,
     filteredSessions: List<TimerSession>,
-    contexts: List<ProjectContext>
+    contexts: List<ProjectContext>,
+    routineMarkers: (LocalDate) -> Map<Long, Boolean> = { emptyMap() }
 ) {
     val currentMonth = remember(selectedDate) { YearMonth.from(selectedDate) }
     val startMonth = currentMonth.minusMonths(100)
@@ -526,6 +545,7 @@ fun WeekView(
                 tasks = dayTasks,
                 sessions = daySessions,
                 contexts = contexts,
+                routineMarkers = routineMarkers(day.date),
                 onClick = { onDateClick(day.date) }
             )
         },
@@ -564,6 +584,7 @@ fun WeekDayCell(
     tasks: List<Task>,
     sessions: List<TimerSession>,
     contexts: List<ProjectContext>,
+    routineMarkers: Map<Long, Boolean> = emptyMap(),
     onClick: () -> Unit
 ) {
     Box(
@@ -618,6 +639,19 @@ fun WeekDayCell(
                         color = MaterialTheme.colorScheme.onSurface,
                         fontSize = 8.sp
                     )
+                }
+            }
+            if (routineMarkers.isNotEmpty()) {
+                Row(
+                    horizontalArrangement = Arrangement.Center,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    routineMarkers.forEach { (_, done) ->
+                        Text(
+                            text = if (done) "✅" else "❌",
+                            fontSize = 7.sp
+                        )
+                    }
                 }
             }
         }
@@ -749,6 +783,7 @@ fun DayTimeline(
     val hourHeightDp = 60
     val timelineHeightDp = hourHeightDp * 24
     val sessionColor = MaterialTheme.colorScheme.tertiary
+    val routineColor = MaterialTheme.colorScheme.secondary
     val minHeightDp = MIN_CARD_HEIGHT_DP
 
     val rawEvents = remember(dayTasks, daySessions, selectedDate, contexts, allTasks, sessionColor) {
@@ -794,7 +829,26 @@ fun DayTimeline(
                 taskId = session.taskId
             )
         }
-        (taskEvents + sessionEvents).sortedBy { it.startTime }
+        val routineEvents = allTasks.filter { task ->
+            task.priority == 4 && !task.isDone &&
+            task.routineFrequency != null && task.routineStartMinutes != null && task.routineEndMinutes != null &&
+            when (task.routineFrequency) {
+                "daily" -> true
+                "weekly" -> (task.routineDayOfWeek ?: return@filter false) == selectedDate.dayOfWeek.value
+                "monthly" -> (task.routineDayOfMonth ?: return@filter false) == selectedDate.dayOfMonth
+                else -> false
+            }
+        }.map { task ->
+            TimelineEvent(
+                startTime = LocalTime.of(task.routineStartMinutes!! / 60, task.routineStartMinutes!! % 60),
+                endTime = LocalTime.of(task.routineEndMinutes!! / 60, task.routineEndMinutes!! % 60),
+                title = task.title,
+                color = routineColor.copy(alpha = 0.6f),
+                isSession = false,
+                taskId = task.id
+            )
+        }
+        (taskEvents + sessionEvents + routineEvents).sortedBy { it.startTime }
     }
 
     val layoutEvents = remember(rawEvents) { calculateEventLayouts(rawEvents, MIN_CARD_HEIGHT_MINUTES) }

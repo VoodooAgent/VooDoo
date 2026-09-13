@@ -276,7 +276,15 @@ fun VooDooNavHost(viewModel: MainViewModel) {
                 emoji = emoji,
                 groupEnabled = groupEnabled,
                 onBackClick = { navController.popBackStack() },
-                onToggleGroup = onToggle
+                onToggleGroup = onToggle,
+                onStatsClick = if (type == "routine") {
+                    { navController.navigate("routine_stats") }
+                } else null
+            )
+        }
+        composable("routine_stats") {
+            RoutineStatsScreen(
+                onBackClick = { navController.popBackStack() }
             )
         }
         composable("ical_sync") {

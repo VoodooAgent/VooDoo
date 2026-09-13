@@ -6,7 +6,10 @@ import androidx.lifecycle.viewModelScope
 import com.example.voodoo.data.*
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
+import java.time.DayOfWeek
+import java.time.Instant
 import java.time.LocalDate
+import java.time.ZoneId
 
 class CalendarViewModel(application: Application) : AndroidViewModel(application) {
     private val database = AppDatabase.getDatabase(application)
@@ -77,6 +80,39 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
             val updated = _settings.value.copy(showSessions = show)
             settingsDao.upsert(updated)
         }
+    }
+
+    fun isRoutineScheduledOnDate(task: Task, date: LocalDate): Boolean {
+        if (task.priority != 4 || task.routineFrequency == null) return false
+        return when (task.routineFrequency) {
+            "daily" -> true
+            "weekly" -> {
+                val taskDow = task.routineDayOfWeek ?: return false
+                date.dayOfWeek.value == taskDow
+            }
+            "monthly" -> {
+                val taskDom = task.routineDayOfMonth ?: return false
+                date.dayOfMonth == taskDom
+            }
+            else -> false
+        }
+    }
+
+    fun isRoutineDoneOnDate(taskId: Long, date: LocalDate, allSessions: List<TimerSession>): Boolean {
+        val dayStart = date.atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
+        val dayEnd = date.plusDays(1).atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
+        return allSessions.any { it.taskId == taskId && it.startTime in dayStart until dayEnd }
+    }
+
+    fun getRoutineMarkers(
+        date: LocalDate,
+        allTasks: List<Task>,
+        allSessions: List<TimerSession>
+    ): Map<Long, Boolean> {
+        val routine = allTasks.filter {
+            it.priority == 4 && !it.isDone && it.routineFrequency != null && isRoutineScheduledOnDate(it, date)
+        }
+        return routine.associate { it.id to isRoutineDoneOnDate(it.id, date, allSessions) }
     }
 
     fun toggleContextEnabled(contextId: Long, enabled: Boolean) {

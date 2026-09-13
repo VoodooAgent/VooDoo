@@ -16,7 +16,8 @@ fun SpecialContextDetailScreen(
     emoji: String,
     groupEnabled: Boolean,
     onBackClick: () -> Unit,
-    onToggleGroup: (Boolean) -> Unit
+    onToggleGroup: (Boolean) -> Unit,
+    onStatsClick: (() -> Unit)? = null
 ) {
     Scaffold(
         topBar = {
@@ -50,6 +51,15 @@ fun SpecialContextDetailScreen(
                         checked = groupEnabled,
                         onCheckedChange = onToggleGroup
                     )
+                }
+            }
+
+            if (onStatsClick != null) {
+                Button(
+                    onClick = onStatsClick,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("Статистика рутины")
                 }
             }
         }
