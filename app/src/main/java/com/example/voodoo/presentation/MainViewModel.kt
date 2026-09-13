@@ -89,15 +89,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    // НОВОЕ: Обновление показа выполненных подзадач при свайпе
-    fun updateShowCompletedInSwipe(enabled: Boolean) {
-        viewModelScope.launch {
-            val current = _settings.value
-            val updated = current.copy(showCompletedInSwipe = enabled)
-            settingsDao.upsert(updated)
-        }
-    }
-
     fun exportData(uri: Uri) {
         viewModelScope.launch {
             val result = csvHelper.exportToCsv(uri)

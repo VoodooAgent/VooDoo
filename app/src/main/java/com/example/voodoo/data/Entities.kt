@@ -101,8 +101,7 @@ data class AppSettings(
 
     // НОВОЕ: настройки сортировки
     val taskSortMode: String = "manual",  // manual, created_at, planned_start, deadline
-    val groupSpecialContexts: Boolean = true,
-    val showCompletedInSwipe: Boolean = true
+    val groupSpecialContexts: Boolean = true
 )
 
 @Entity(
