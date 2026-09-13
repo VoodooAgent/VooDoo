@@ -248,18 +248,6 @@ val settings by viewModel.settings.collectAsState()
                 )
             }
 
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text("Показывать выполненные подзадачи при свайпе")
-                Switch(
-                    checked = settings.showCompletedInSwipe,
-                    onCheckedChange = { viewModel.updateShowCompletedInSwipe(it) }
-                )
-            }
-
             Spacer(modifier = Modifier.height(16.dp))
 
             // НОВОЕ: Кнопка управления контекстами
