@@ -143,6 +143,12 @@ interface TaskDao {
     @Query("UPDATE tasks SET routineEndMinutes = :minutes WHERE id = :taskId")
     suspend fun updateRoutineEndMinutes(taskId: Long, minutes: Int?)
 
+    @Query("UPDATE tasks SET routineDayOfWeek = :day WHERE id = :taskId")
+    suspend fun updateRoutineDayOfWeek(taskId: Long, day: Int?)
+
+    @Query("UPDATE tasks SET routineDayOfMonth = :day WHERE id = :taskId")
+    suspend fun updateRoutineDayOfMonth(taskId: Long, day: Int?)
+
     @Query("""
         UPDATE tasks 
         SET parentId = NULL, level = 0 

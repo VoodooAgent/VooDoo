@@ -52,6 +52,8 @@ fun TaskDetailScreen(
     var routineFrequency by remember { mutableStateOf<String?>(null) }
     var routineStartMinutes by remember { mutableStateOf<Int?>(null) }
     var routineEndMinutes by remember { mutableStateOf<Int?>(null) }
+    var routineDayOfWeek by remember { mutableStateOf<Int?>(null) }
+    var routineDayOfMonth by remember { mutableStateOf<Int?>(null) }
     var isInitialized by remember { mutableStateOf(false) }
     var showStartDatePicker by remember { mutableStateOf(false) }
     var showEndDatePicker by remember { mutableStateOf(false) }
@@ -81,6 +83,8 @@ fun TaskDetailScreen(
                 routineFrequency = t.routineFrequency
                 routineStartMinutes = t.routineStartMinutes
                 routineEndMinutes = t.routineEndMinutes
+                routineDayOfWeek = t.routineDayOfWeek
+                routineDayOfMonth = t.routineDayOfMonth
                 isInitialized = true
             }
         }
@@ -99,7 +103,9 @@ fun TaskDetailScreen(
                     reminderMinutesBefore = reminderMinutes,
                     routineFrequency = routineFrequency,
                     routineStartMinutes = routineStartMinutes,
-                    routineEndMinutes = routineEndMinutes
+                    routineEndMinutes = routineEndMinutes,
+                    routineDayOfWeek = routineDayOfWeek,
+                    routineDayOfMonth = routineDayOfMonth
                 )
             )
         }
@@ -381,6 +387,46 @@ fun TaskDetailScreen(
                                     )
                                 }
                             }
+
+                            if (routineFrequency == "weekly") {
+                                Spacer(modifier = Modifier.height(12.dp))
+                                Text("День недели:", style = MaterialTheme.typography.labelMedium)
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                ) {
+                                    listOf(
+                                        1 to "Пн", 2 to "Вт", 3 to "Ср", 4 to "Чт",
+                                        5 to "Пт", 6 to "Сб", 7 to "Вс"
+                                    ).forEach { (day, label) ->
+                                        FilterChip(
+                                            selected = routineDayOfWeek == day,
+                                            onClick = {
+                                                routineDayOfWeek = day
+                                                listViewModel.updateTask(currentTask.copy(routineDayOfWeek = day))
+                                            },
+                                            label = { Text(label, maxLines = 1) }
+                                        )
+                                    }
+                                }
+                            }
+
+                            if (routineFrequency == "monthly") {
+                                Spacer(modifier = Modifier.height(12.dp))
+                                Text("Число месяца:", style = MaterialTheme.typography.labelMedium)
+                                Spacer(modifier = Modifier.height(4.dp))
+                                OutlinedTextField(
+                                    value = (routineDayOfMonth ?: 1).toString(),
+                                    onValueChange = { v ->
+                                        val d = v.filter { it.isDigit() }.take(2).toIntOrNull()?.coerceIn(1, 31) ?: 1
+                                        routineDayOfMonth = d
+                                        listViewModel.updateTask(currentTask.copy(routineDayOfMonth = d))
+                                    },
+                                    modifier = Modifier.width(80.dp), singleLine = true
+                                )
+                            }
+
                             Spacer(modifier = Modifier.height(12.dp))
                             Text("Начало:", style = MaterialTheme.typography.labelMedium)
                             Spacer(modifier = Modifier.height(4.dp))

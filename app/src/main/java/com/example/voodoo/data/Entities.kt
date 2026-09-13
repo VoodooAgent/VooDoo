@@ -63,6 +63,8 @@ data class Task(
     val routineFrequency: String? = null,  // "daily", "weekly", "monthly" — для рутинных задач
     val routineStartMinutes: Int? = null,  // время начала в минутах от 0:00
     val routineEndMinutes: Int? = null,  // время окончания в минутах от 0:00
+    val routineDayOfWeek: Int? = null,  // 1=пн...7=вс для weekly
+    val routineDayOfMonth: Int? = null,  // 1..31 для monthly
     val reminderMinutesBefore: Int? = null,
     val createdAt: Long = System.currentTimeMillis(),
     val completedAt: Long? = null,

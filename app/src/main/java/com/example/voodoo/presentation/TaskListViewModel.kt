@@ -553,4 +553,12 @@ class TaskListViewModel(application: Application) : AndroidViewModel(application
     suspend fun updateRoutineEndMinutes(taskId: Long, minutes: Int?) {
         taskDao.updateRoutineEndMinutes(taskId, minutes)
     }
+
+    suspend fun updateRoutineDayOfWeek(taskId: Long, day: Int?) {
+        taskDao.updateRoutineDayOfWeek(taskId, day)
+    }
+
+    suspend fun updateRoutineDayOfMonth(taskId: Long, day: Int?) {
+        taskDao.updateRoutineDayOfMonth(taskId, day)
+    }
 }
