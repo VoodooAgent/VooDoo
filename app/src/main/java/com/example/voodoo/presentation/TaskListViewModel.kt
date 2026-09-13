@@ -491,8 +491,4 @@ class TaskListViewModel(application: Application) : AndroidViewModel(application
 
         return roots.map { buildNode(it) }
     }
-
-    suspend fun getCompletedSubtasksSync(taskId: Long): List<Task> {
-        return taskDao.getCompletedSubtasks(taskId).first()
-    }
 }

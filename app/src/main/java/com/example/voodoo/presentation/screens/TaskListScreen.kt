@@ -46,8 +46,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextDecoration
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.voodoo.data.Task
 import com.example.voodoo.data.TaskWithChildren
@@ -140,11 +142,11 @@ fun TaskListScreen(
     val settings by mainViewModel.settings.collectAsState()
     val durations by taskListViewModel.taskDurations.collectAsState()
     val pendingCompletionTask by taskListViewModel.pendingCompletionTask.collectAsState()
+    val showCompletedSubtasksIds by com.example.voodoo.presentation.ShowCompletedState.ids.collectAsState()
 
     var showCreateDialog by remember { mutableStateOf(false) }
     var showSwipeMenu by remember { mutableStateOf<Task?>(null) }
     var createParentId by remember { mutableStateOf<Long?>(null) }
-    var completedSubtasks by remember { mutableStateOf<List<Task>>(emptyList()) }
     var completedExpanded by remember(contextId) { mutableStateOf(false) }
     var expandedPeriods by remember(contextId) { mutableStateOf<Set<String>>(emptySet()) }
 
@@ -291,6 +293,8 @@ fun TaskListScreen(
                     expandedIds = expandedIds,
                     fontSize = settings.fontSize,
                     allTasks = activeTasks,
+                    allTasksWithDone = tasks,
+                    showCompletedSubtasksIds = showCompletedSubtasksIds,
                     viewModel = taskListViewModel,
                     durations = durations,
                     onTaskClick = onTaskClick,
@@ -397,10 +401,6 @@ fun TaskListScreen(
     }
 
     showSwipeMenu?.let { task ->
-        LaunchedEffect(task.id) {
-            completedSubtasks = taskListViewModel.getCompletedSubtasksSync(task.id)
-        }
-
         TaskSwipeMenu(
             onDismiss = { showSwipeMenu = null },
             onAddSubtaskClick = {
@@ -426,8 +426,7 @@ fun TaskListScreen(
             onRestoreClick = {
                 taskListViewModel.toggleTaskDone(task)
                 showSwipeMenu = null
-            },
-            completedSubtasks = completedSubtasks
+            }
         )
     }
 
@@ -446,13 +445,22 @@ fun TaskTreeItem(
     expandedIds: Set<Long>,
     fontSize: Int,
     allTasks: List<Task>,
+    allTasksWithDone: List<Task>,
+    showCompletedSubtasksIds: Set<Long>,
     viewModel: TaskListViewModel,
     durations: Map<Long, Long>,
     onTaskClick: (Long) -> Unit,
     onSwipeLeft: (Task) -> Unit
 ) {
     val children = allTasks.filter { it.parentId == task.id }
-    val isExpanded = expandedIds.contains(task.id)
+    val completedChildren = remember(task.id, allTasksWithDone) {
+        allTasksWithDone.filter { it.parentId == task.id && it.isDone }
+    }
+    val showCompleted = showCompletedSubtasksIds.contains(task.id)
+    val mergedChildren = remember(children, completedChildren, showCompleted) {
+        if (showCompleted) (children + completedChildren).sortedBy { it.sortOrder } else children
+    }
+    val isExpanded = expandedIds.contains(task.id) || showCompleted
 
     Column {
         Row(
@@ -493,7 +501,7 @@ fun TaskTreeItem(
             }
         }
 
-        if (isExpanded && children.isNotEmpty()) {
+        if (isExpanded && mergedChildren.isNotEmpty()) {
             Row(
                 modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Max)
             ) {
@@ -503,21 +511,51 @@ fun TaskTreeItem(
                 )
                 Spacer(modifier = Modifier.width(4.dp))
                 Column(modifier = Modifier.weight(1f)) {
-                    children.forEach { child ->
-                        TaskTreeItem(
-                            task = child,
-                            expandedIds = expandedIds,
-                            fontSize = fontSize,
-                            allTasks = allTasks,
-                            viewModel = viewModel,
-                            durations = durations,
-                            onTaskClick = onTaskClick,
-                            onSwipeLeft = onSwipeLeft
-                        )
+                    mergedChildren.forEach { child ->
+                        if (child.isDone) {
+                            CompletedSubtaskRow(task = child, fontSize = fontSize)
+                        } else {
+                            TaskTreeItem(
+                                task = child,
+                                expandedIds = expandedIds,
+                                fontSize = fontSize,
+                                allTasks = allTasks,
+                                allTasksWithDone = allTasksWithDone,
+                                showCompletedSubtasksIds = showCompletedSubtasksIds,
+                                viewModel = viewModel,
+                                durations = durations,
+                                onTaskClick = onTaskClick,
+                                onSwipeLeft = onSwipeLeft
+                            )
+                        }
                     }
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun CompletedSubtaskRow(
+    task: Task,
+    fontSize: Int
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Spacer(modifier = Modifier.width(28.dp))
+        Text(
+            text = task.title,
+            fontSize = (15 * fontSize / 16f).sp,
+            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
+            textDecoration = TextDecoration.LineThrough,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier
+                .weight(1f)
+                .padding(horizontal = 8.dp, vertical = 6.dp)
+        )
     }
 }
 

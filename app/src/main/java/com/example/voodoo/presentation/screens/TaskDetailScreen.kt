@@ -17,6 +17,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.voodoo.data.TimerSession
 import com.example.voodoo.presentation.MainViewModel
+import com.example.voodoo.presentation.ShowCompletedState
 import com.example.voodoo.presentation.TaskDetailViewModel
 import com.example.voodoo.presentation.TaskListViewModel
 import java.util.*
@@ -35,6 +36,7 @@ fun TaskDetailScreen(
     val allTasks by detailViewModel.allTasks.collectAsState()
     val contexts by detailViewModel.contexts.collectAsState()
     val settings by mainViewModel.settings.collectAsState()
+    val showCompletedSubtasksIds by ShowCompletedState.ids.collectAsState()
 
     LaunchedEffect(taskId) {
         detailViewModel.loadTask(taskId)
@@ -113,6 +115,8 @@ fun TaskDetailScreen(
             val parentTask = allTasks.find { it.id == currentTask.parentId }
             val contextName = contexts.find { it.id == currentTask.contextId }?.name
                 ?: settings.noContextName
+            val completedSubtaskCount = allTasks.count { it.parentId == currentTask.id && it.isDone }
+            val showCompletedSubtasks = showCompletedSubtasksIds.contains(currentTask.id)
 
             Column(
                 modifier = Modifier
@@ -134,6 +138,24 @@ fun TaskDetailScreen(
                             singleLine = true,
                             placeholder = { Text("Введите название...") }
                         )
+
+                        if (completedSubtaskCount > 0) {
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Checkbox(
+                                    checked = showCompletedSubtasks,
+                                    onCheckedChange = { ShowCompletedState.toggle(currentTask.id) }
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    "Показывать выполненные подзадачи ($completedSubtaskCount)",
+                                    style = MaterialTheme.typography.bodyMedium
+                                )
+                            }
+                        }
                     }
                 }
 

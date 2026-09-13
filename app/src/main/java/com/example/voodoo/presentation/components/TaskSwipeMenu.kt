@@ -23,10 +23,8 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
-import com.example.voodoo.data.Task
 
 @Composable
 fun TaskSwipeMenu(
@@ -38,16 +36,14 @@ fun TaskSwipeMenu(
     isDone: Boolean = false,
     onRestoreClick: (() -> Unit)? = null,
     onICalClick: (() -> Unit)? = null,
-    onEditClick: (() -> Unit)? = null,
-    completedSubtasks: List<Task> = emptyList(), // НОВОЕ
-    onToggleSubtaskDone: (Task) -> Unit = {} // НОВОЕ
+    onEditClick: (() -> Unit)? = null
 ) {
     Dialog(onDismissRequest = onDismiss) {
         Card(modifier = Modifier.fillMaxWidth()) {
             Column(
                 modifier = Modifier
                     .padding(16.dp)
-                    .verticalScroll(rememberScrollState()), // Добавляем скролл для длинных списков
+                    .verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 Text(
@@ -56,7 +52,6 @@ fun TaskSwipeMenu(
                     modifier = Modifier.padding(bottom = 8.dp)
                 )
 
-                // Кнопка «Вернуть в активные» — только для выполненных задач
                 if (isDone && onRestoreClick != null) {
                     Button(
                         onClick = onRestoreClick,
@@ -68,7 +63,6 @@ fun TaskSwipeMenu(
                     }
                 }
 
-                // НОВОЕ: Кнопки перемещения (только для активных задач)
                 if (!isDone && (onMoveUpClick != null || onMoveDownClick != null)) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -125,39 +119,6 @@ fun TaskSwipeMenu(
                     Icon(Icons.Default.Delete, contentDescription = null)
                     Spacer(modifier = Modifier.width(8.dp))
                     Text("Удалить")
-                }
-
-                // НОВОЕ: Список выполненных подзадач
-                if (completedSubtasks.isNotEmpty()) {
-                    Spacer(modifier = Modifier.padding(top = 8.dp))
-                    Text(
-                        text = "Выполненные подзадачи (${completedSubtasks.size}):",
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
-                        modifier = Modifier.padding(bottom = 4.dp)
-                    )
-
-                    Column(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalArrangement = Arrangement.spacedBy(4.dp)
-                    ) {
-                        completedSubtasks.forEach { subtask ->
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(vertical = 2.dp),
-                                verticalAlignment = androidx.compose.ui.Alignment.CenterVertically
-                            ) {
-                                Text(
-                                    text = subtask.title,
-                                    style = MaterialTheme.typography.bodySmall,
-                                    textDecoration = TextDecoration.LineThrough,
-                                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
-                                    modifier = Modifier.weight(1f)
-                                )
-                            }
-                        }
-                    }
                 }
             }
         }
