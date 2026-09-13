@@ -499,11 +499,24 @@ fun TaskDetailScreen(
 
     // Диалог выбора родителя
     if (showParentDialog) {
+        var parentSearchQuery by remember { mutableStateOf("") }
+
         AlertDialog(
             onDismissRequest = { showParentDialog = false },
             title = { Text("Родительская задача") },
             text = {
-                Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
+                Column {
+                    OutlinedTextField(
+                        value = parentSearchQuery,
+                        onValueChange = { parentSearchQuery = it },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true,
+                        placeholder = { Text("Поиск...") },
+                        leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) }
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    val filteredParents = detailViewModel.eligibleParents(taskId, allTasks)
+                        .filter { parentSearchQuery.isBlank() || it.title.contains(parentSearchQuery, ignoreCase = true) }
                     TextButton(
                         onClick = {
                             detailViewModel.updateParent(null)
@@ -513,19 +526,21 @@ fun TaskDetailScreen(
                     ) {
                         Text("Нет (корневая задача)", modifier = Modifier.fillMaxWidth())
                     }
-                    detailViewModel.eligibleParents(taskId, allTasks).forEach { t ->
-                        TextButton(
-                            onClick = {
-                                detailViewModel.updateParent(t.id)
-                                showParentDialog = false
-                            },
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Text(
-                                text = "· ".repeat(t.level) + t.title,
-                                modifier = Modifier.fillMaxWidth(),
-                                maxLines = 1
-                            )
+                    Column(modifier = Modifier.verticalScroll(rememberScrollState()).weight(1f)) {
+                        filteredParents.forEach { t ->
+                            TextButton(
+                                onClick = {
+                                    detailViewModel.updateParent(t.id)
+                                    showParentDialog = false
+                                },
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Text(
+                                    text = "· ".repeat(t.level) + t.title,
+                                    modifier = Modifier.fillMaxWidth(),
+                                    maxLines = 1
+                                )
+                            }
                         }
                     }
                 }
