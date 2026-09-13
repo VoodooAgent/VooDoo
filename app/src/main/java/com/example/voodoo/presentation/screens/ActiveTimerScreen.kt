@@ -1,5 +1,6 @@
 package com.example.voodoo.presentation.screens
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -45,6 +46,7 @@ import com.example.voodoo.presentation.components.TaskSwipeMenu
 fun ActiveTimerScreen(
     onBackClick: () -> Unit,
     onTaskClick: (Long) -> Unit,
+    onDetailsClick: () -> Unit = {},
     taskListViewModel: TaskListViewModel = viewModel(),
     mainViewModel: MainViewModel = viewModel()
 ) {
@@ -75,9 +77,12 @@ fun ActiveTimerScreen(
                             style = MaterialTheme.typography.titleLarge
                         )
                         Spacer(modifier = Modifier.width(6.dp))
-                        Text("Активные задачи")
+                        Text(
+                            text = "Активные задачи",
+                            modifier = Modifier.clickable { onDetailsClick() }
+                        )
 
-                        if (settings.groupSpecialContexts) {
+                        if (settings.groupActive) {
                             Spacer(modifier = Modifier.width(4.dp))
                             IconButton(
                                 onClick = {
@@ -116,7 +121,7 @@ fun ActiveTimerScreen(
                 }
             }
 
-            if (settings.groupSpecialContexts) {
+            if (settings.groupActive) {
                 tasksByContext.forEach { (contextId, tasks) ->
                     val contextName = if (contextId == null) {
                         settings.noContextName

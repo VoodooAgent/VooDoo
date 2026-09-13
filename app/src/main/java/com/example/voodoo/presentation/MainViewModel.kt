@@ -80,11 +80,27 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    // НОВОЕ: Обновление группировки в спец. контекстах
-    fun updateGroupSpecialContexts(enabled: Boolean) {
+    // НОВОЕ: Обновление группировки в спец. контекстах (по отдельности)
+    fun updateGroupPriority(enabled: Boolean) {
         viewModelScope.launch {
             val current = _settings.value
-            val updated = current.copy(groupSpecialContexts = enabled)
+            val updated = current.copy(groupPriority = enabled)
+            settingsDao.upsert(updated)
+        }
+    }
+
+    fun updateGroupRoutine(enabled: Boolean) {
+        viewModelScope.launch {
+            val current = _settings.value
+            val updated = current.copy(groupRoutine = enabled)
+            settingsDao.upsert(updated)
+        }
+    }
+
+    fun updateGroupActive(enabled: Boolean) {
+        viewModelScope.launch {
+            val current = _settings.value
+            val updated = current.copy(groupActive = enabled)
             settingsDao.upsert(updated)
         }
     }

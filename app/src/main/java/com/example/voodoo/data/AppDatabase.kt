@@ -16,7 +16,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         ICalSyncSetting::class,
         CalendarContextSetting::class
     ],
-    version = 8,  // Обновлено с 7 до 8
+    version = 10,  // Обновлено с 9 до 10
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -185,6 +185,64 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        // НОВАЯ МИГРАЦИЯ 8 -> 9
+        private val MIGRATION_8_9 = object : Migration(8, 9) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                // Пересоздаём app_settings, чтобы убрать устаревшую колонку groupSpecialContexts
+                database.execSQL("ALTER TABLE app_settings RENAME TO app_settings_old")
+                database.execSQL("""
+                    CREATE TABLE app_settings (
+                        id INTEGER PRIMARY KEY NOT NULL DEFAULT 1,
+                        darkTheme INTEGER NOT NULL DEFAULT 1,
+                        fontSize INTEGER NOT NULL DEFAULT 16,
+                        noContextName TEXT NOT NULL DEFAULT 'Без контекста',
+                        showTasks INTEGER NOT NULL DEFAULT 1,
+                        showSessions INTEGER NOT NULL DEFAULT 1,
+                        taskSortMode TEXT NOT NULL DEFAULT 'manual',
+                        showCompletedInSwipe INTEGER NOT NULL DEFAULT 1,
+                        groupPriority INTEGER NOT NULL DEFAULT 1,
+                        groupRoutine INTEGER NOT NULL DEFAULT 1,
+                        groupActive INTEGER NOT NULL DEFAULT 1
+                    )
+                """)
+                database.execSQL("""
+                    INSERT INTO app_settings (id, darkTheme, fontSize, noContextName, showTasks, showSessions, taskSortMode, showCompletedInSwipe)
+                    SELECT id, darkTheme, fontSize, noContextName, showTasks, showSessions, taskSortMode, showCompletedInSwipe
+                    FROM app_settings_old
+                """)
+                database.execSQL("DROP TABLE app_settings_old")
+            }
+        }
+
+        // НОВАЯ МИГРАЦИЯ 9 -> 10: чинит БД, где миграция 8->9 уже применена,
+        // но колонка groupSpecialContexts осталась в таблице
+        private val MIGRATION_9_10 = object : Migration(9, 10) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                database.execSQL("ALTER TABLE app_settings RENAME TO app_settings_old")
+                database.execSQL("""
+                    CREATE TABLE app_settings (
+                        id INTEGER PRIMARY KEY NOT NULL DEFAULT 1,
+                        darkTheme INTEGER NOT NULL DEFAULT 1,
+                        fontSize INTEGER NOT NULL DEFAULT 16,
+                        noContextName TEXT NOT NULL DEFAULT 'Без контекста',
+                        showTasks INTEGER NOT NULL DEFAULT 1,
+                        showSessions INTEGER NOT NULL DEFAULT 1,
+                        taskSortMode TEXT NOT NULL DEFAULT 'manual',
+                        showCompletedInSwipe INTEGER NOT NULL DEFAULT 1,
+                        groupPriority INTEGER NOT NULL DEFAULT 1,
+                        groupRoutine INTEGER NOT NULL DEFAULT 1,
+                        groupActive INTEGER NOT NULL DEFAULT 1
+                    )
+                """)
+                database.execSQL("""
+                    INSERT INTO app_settings (id, darkTheme, fontSize, noContextName, showTasks, showSessions, taskSortMode, showCompletedInSwipe, groupPriority, groupRoutine, groupActive)
+                    SELECT id, darkTheme, fontSize, noContextName, showTasks, showSessions, taskSortMode, showCompletedInSwipe, groupPriority, groupRoutine, groupActive
+                    FROM app_settings_old
+                """)
+                database.execSQL("DROP TABLE app_settings_old")
+            }
+        }
+
         fun getDatabase(context: Context): AppDatabase {
             return INSTANCE ?: synchronized(this) {
                 val instance = Room.databaseBuilder(
@@ -192,7 +250,7 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "voodoo_database"
                 )
-                    .addMigrations(MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8)
+                    .addMigrations(MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10)
                     .build()
                 INSTANCE = instance
                 instance

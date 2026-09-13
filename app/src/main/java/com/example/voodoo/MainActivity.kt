@@ -226,19 +226,57 @@ fun VooDooNavHost(viewModel: MainViewModel) {
         composable("priority") {
             PriorityScreen(
                 onBackClick = { navController.popBackStack() },
-                onTaskClick = { taskId -> navController.navigate("task/$taskId") }
+                onTaskClick = { taskId -> navController.navigate("task/$taskId") },
+                onDetailsClick = { navController.navigate("special_detail/priority") }
             )
         }
         composable("routine") {
             RoutineScreen(
                 onBackClick = { navController.popBackStack() },
-                onTaskClick = { taskId -> navController.navigate("task/$taskId") }
+                onTaskClick = { taskId -> navController.navigate("task/$taskId") },
+                onDetailsClick = { navController.navigate("special_detail/routine") }
             )
         }
         composable("active_timer") {
             ActiveTimerScreen(
                 onBackClick = { navController.popBackStack() },
-                onTaskClick = { taskId -> navController.navigate("task/$taskId") }
+                onTaskClick = { taskId -> navController.navigate("task/$taskId") },
+                onDetailsClick = { navController.navigate("special_detail/active") }
+            )
+        }
+        composable("special_detail/{type}", arguments = listOf(navArgument("type") { type = NavType.StringType })) { backStackEntry ->
+            val type = backStackEntry.arguments?.getString("type")
+            val settings by viewModel.settings.collectAsState()
+            val groupEnabled = when (type) {
+                "priority" -> settings.groupPriority
+                "routine" -> settings.groupRoutine
+                "active" -> settings.groupActive
+                else -> false
+            }
+            val label = when (type) {
+                "priority" -> "Приоритетные задачи"
+                "routine" -> "Рутина"
+                "active" -> "Активные задачи"
+                else -> ""
+            }
+            val emoji = when (type) {
+                "priority" -> "⭐"
+                "routine" -> "🔄"
+                "active" -> "⏱️"
+                else -> ""
+            }
+            val onToggle: (Boolean) -> Unit = when (type) {
+                "priority" -> { enabled -> viewModel.updateGroupPriority(enabled) }
+                "routine" -> { enabled -> viewModel.updateGroupRoutine(enabled) }
+                "active" -> { enabled -> viewModel.updateGroupActive(enabled) }
+                else -> { {} }
+            }
+            SpecialContextDetailScreen(
+                label = label,
+                emoji = emoji,
+                groupEnabled = groupEnabled,
+                onBackClick = { navController.popBackStack() },
+                onToggleGroup = onToggle
             )
         }
         composable("ical_sync") {

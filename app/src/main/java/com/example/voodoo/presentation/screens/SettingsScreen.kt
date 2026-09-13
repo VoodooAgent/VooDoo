@@ -235,19 +235,6 @@ val settings by viewModel.settings.collectAsState()
 
             Spacer(modifier = Modifier.height(8.dp))
 
-            // Переключатели
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text("Группировать спец. контексты по проектам")
-                Switch(
-                    checked = settings.groupSpecialContexts,
-                    onCheckedChange = { viewModel.updateGroupSpecialContexts(it) }
-                )
-            }
-
             Spacer(modifier = Modifier.height(16.dp))
 
             // НОВОЕ: Кнопка управления контекстами
