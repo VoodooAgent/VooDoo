@@ -1,6 +1,7 @@
 package com.example.voodoo.presentation.screens
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -228,6 +229,7 @@ private fun ContextEditDialog(
                                     modifier = Modifier
                                         .size(36.dp)
                                         .background(Color(c), MaterialTheme.shapes.small)
+                                        .clickable { color = c }
                                         .then(
                                             if (color == c) {
                                                 Modifier.background(
