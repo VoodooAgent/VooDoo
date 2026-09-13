@@ -40,7 +40,7 @@ class CsvHelper(private val context: Context) {
                     csvWriter.writeNext(arrayOf(
                         "id", "contextId", "parentId", "level", "title", "description",
                         "result", "isDone", "priority", "sortOrder", "plannedStart",
-                        "plannedEnd", "reminderMinutesBefore", "createdAt", "completedAt",
+                        "plannedEnd", "deadline", "reminderMinutesBefore", "createdAt", "completedAt",
                         "timerActive", "timerStartedAt"
                     ))
                     taskDao.getAllTasksSync().forEach { task ->
@@ -57,6 +57,7 @@ class CsvHelper(private val context: Context) {
                             task.sortOrder.toString(),
                             task.plannedStart?.toString() ?: "",
                             task.plannedEnd?.toString() ?: "",
+                            task.deadline?.toString() ?: "",
                             task.reminderMinutesBefore?.toString() ?: "",
                             task.createdAt.toString(),
                             task.completedAt?.toString() ?: "",
@@ -133,27 +134,29 @@ class CsvHelper(private val context: Context) {
                                         }
                                     }
                                     "tasks" -> {
-                                        if (line.size >= 17) {
-                                            tasks.add(Task(
-                                                id = line[0].toLongOrNull() ?: 0,
-                                                contextId = line[1].takeIf { it.isNotBlank() }?.toLongOrNull(),
-                                                parentId = line[2].takeIf { it.isNotBlank() }?.toLongOrNull(),
-                                                level = line[3].toIntOrNull() ?: 0,
-                                                title = line[4],
-                                                description = line[5],
-                                                result = line[6],
-                                                isDone = line[7].toBooleanStrictOrNull() ?: false,
-                                                priority = line[8].toIntOrNull() ?: 0,
-                                                sortOrder = line[9].toIntOrNull() ?: 0,
-                                                plannedStart = line[10].takeIf { it.isNotBlank() }?.toLongOrNull(),
-                                                plannedEnd = line[11].takeIf { it.isNotBlank() }?.toLongOrNull(),
-                                                reminderMinutesBefore = line[12].takeIf { it.isNotBlank() }?.toIntOrNull(),
-                                                createdAt = line[13].toLongOrNull() ?: System.currentTimeMillis(),
-                                                completedAt = line[14].takeIf { it.isNotBlank() }?.toLongOrNull(),
-                                                timerActive = line[15].toBooleanStrictOrNull() ?: false,
-                                                timerStartedAt = line[16].takeIf { it.isNotBlank() }?.toLongOrNull()
-                                            ))
-                                        }
+                                        // Новый формат (18 колонок) включает deadline, старый (17) — нет.
+                                        // Определяем по длине строки.
+                                        val hasDeadline = line.size >= 18
+                                        tasks.add(Task(
+                                            id = line.getOrNull(0)?.toLongOrNull() ?: 0,
+                                            contextId = line.getOrNull(1)?.takeIf { it.isNotBlank() }?.toLongOrNull(),
+                                            parentId = line.getOrNull(2)?.takeIf { it.isNotBlank() }?.toLongOrNull(),
+                                            level = line.getOrNull(3)?.toIntOrNull() ?: 0,
+                                            title = line.getOrNull(4) ?: "",
+                                            description = line.getOrNull(5) ?: "",
+                                            result = line.getOrNull(6) ?: "",
+                                            isDone = line.getOrNull(7)?.toBooleanStrictOrNull() ?: false,
+                                            priority = line.getOrNull(8)?.toIntOrNull() ?: 0,
+                                            sortOrder = line.getOrNull(9)?.toIntOrNull() ?: 0,
+                                            plannedStart = line.getOrNull(10)?.takeIf { it.isNotBlank() }?.toLongOrNull(),
+                                            plannedEnd = line.getOrNull(11)?.takeIf { it.isNotBlank() }?.toLongOrNull(),
+                                            deadline = if (hasDeadline) line.getOrNull(12)?.takeIf { it.isNotBlank() }?.toLongOrNull() else null,
+                                            reminderMinutesBefore = if (hasDeadline) line.getOrNull(13)?.takeIf { it.isNotBlank() }?.toIntOrNull() else line.getOrNull(12)?.takeIf { it.isNotBlank() }?.toIntOrNull(),
+                                            createdAt = if (hasDeadline) (line.getOrNull(14)?.toLongOrNull() ?: System.currentTimeMillis()) else (line.getOrNull(13)?.toLongOrNull() ?: System.currentTimeMillis()),
+                                            completedAt = if (hasDeadline) line.getOrNull(15)?.takeIf { it.isNotBlank() }?.toLongOrNull() else line.getOrNull(14)?.takeIf { it.isNotBlank() }?.toLongOrNull(),
+                                            timerActive = if (hasDeadline) line.getOrNull(16)?.toBooleanStrictOrNull() ?: false else line.getOrNull(15)?.toBooleanStrictOrNull() ?: false,
+                                            timerStartedAt = if (hasDeadline) line.getOrNull(17)?.takeIf { it.isNotBlank() }?.toLongOrNull() else line.getOrNull(16)?.takeIf { it.isNotBlank() }?.toLongOrNull()
+                                        ))
                                     }
                                     "sessions" -> {
                                         if (line.size >= 5) {
