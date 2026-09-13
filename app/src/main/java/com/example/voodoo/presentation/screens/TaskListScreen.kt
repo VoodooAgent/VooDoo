@@ -517,7 +517,12 @@ fun TaskTreeItem(
                 Column(modifier = Modifier.weight(1f)) {
                     mergedChildren.forEach { child ->
                         if (child.isDone) {
-                            CompletedSubtaskRow(task = child, fontSize = fontSize)
+                            CompletedSubtaskRow(
+                                task = child,
+                                fontSize = fontSize,
+                                duration = durations[child.id] ?: 0L,
+                                onClick = { onTaskClick(child.id) }
+                            )
                         } else {
                             TaskTreeItem(
                                 task = child,
@@ -542,10 +547,14 @@ fun TaskTreeItem(
 @Composable
 private fun CompletedSubtaskRow(
     task: Task,
-    fontSize: Int
+    fontSize: Int,
+    duration: Long = 0L,
+    onClick: () -> Unit
 ) {
     Row(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Spacer(modifier = Modifier.width(28.dp))
@@ -560,7 +569,22 @@ private fun CompletedSubtaskRow(
                 .weight(1f)
                 .padding(horizontal = 8.dp, vertical = 6.dp)
         )
+        if (duration > 0) {
+            Text(
+                text = formatDuration(duration),
+                fontSize = (11 * fontSize / 16f).sp,
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f),
+                modifier = Modifier.padding(start = 4.dp, end = 8.dp)
+            )
+        }
     }
+}
+
+private fun formatDuration(millis: Long): String {
+    val hours = millis / (1000 * 60 * 60)
+    val minutes = (millis % (1000 * 60 * 60)) / (1000 * 60)
+    return if (hours > 0) String.format("%dч %dм", hours, minutes)
+    else String.format("%dм", minutes)
 }
 
 @Composable
