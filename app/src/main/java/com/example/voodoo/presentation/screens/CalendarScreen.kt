@@ -1,8 +1,17 @@
 package com.example.voodoo.presentation.screens
 
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -38,15 +47,20 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.RectangleShape
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
@@ -75,6 +89,7 @@ import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.time.format.TextStyle
 import java.util.Locale
+import kotlin.math.roundToInt
 import kotlin.comparisons.compareBy
 
 private const val MIN_CARD_HEIGHT_MINUTES = 20
@@ -303,7 +318,8 @@ fun CalendarScreen(
                     filteredSessions = filteredSessions,
                     contexts = contexts,
                     tasks = tasks,
-                    onTaskClick = onTaskClick
+                    onTaskClick = onTaskClick,
+                    onSwipeToDate = { viewModel.selectDate(it) }
                 )
             }
         }
@@ -618,55 +634,102 @@ fun DayView(
     filteredSessions: List<TimerSession>,
     contexts: List<ProjectContext>,
     tasks: List<Task>,
-    onTaskClick: (Long) -> Unit
+    onTaskClick: (Long) -> Unit,
+    onSwipeToDate: (LocalDate) -> Unit = {}
 ) {
-    val dayTasks = filteredTasks.filter { task ->
-        task.plannedStart?.let { start ->
-            millisToLocalDate(start) == selectedDate
-        } ?: false
-    }
-    val daySessions = filteredSessions.filter { session ->
-        val startDate = millisToLocalDate(session.startTime)
-        val endDate = millisToLocalDate(session.endTime)
-        !startDate.isAfter(selectedDate) && !endDate.isBefore(selectedDate)
+    var dragOffsetX by remember { mutableStateOf(0f) }
+    val contentWidthPx = with(LocalDensity.current) { LocalConfiguration.current.screenWidthDp.dp.toPx() }
+    var animatedDate by remember { mutableStateOf(selectedDate) }
+
+    fun commitSwipe() {
+        if (dragOffsetX < -contentWidthPx * 0.25f) {
+            onSwipeToDate(selectedDate.plusDays(1))
+        } else if (dragOffsetX > contentWidthPx * 0.25f) {
+            onSwipeToDate(selectedDate.minusDays(1))
+        }
+        dragOffsetX = 0f
     }
 
-    Column(
-        modifier = Modifier.fillMaxSize()
-    ) {
-        Text(
-            text = selectedDate.format(
-                DateTimeFormatter.ofPattern("d MMMM yyyy", Locale.getDefault())
-            ),
-            style = MaterialTheme.typography.titleLarge,
-            modifier = Modifier.padding(16.dp)
-        )
-        val scrollState = rememberScrollState()
-        val density = LocalDensity.current
-        Box(
+    AnimatedContent(
+        targetState = animatedDate,
+        transitionSpec = {
+            val direction = if (targetState > initialState) 1 else -1
+            (slideInHorizontally(
+                animationSpec = tween(280, easing = FastOutSlowInEasing),
+                initialOffsetX = { it * direction }
+            ) + fadeIn(animationSpec = tween(280))) togetherWith
+                (slideOutHorizontally(
+                    animationSpec = tween(280, easing = FastOutSlowInEasing),
+                    targetOffsetX = { it * -direction }
+                ) + fadeOut(animationSpec = tween(280)))
+        },
+        contentKey = { it }
+    ) { date ->
+        val dayTasks = filteredTasks.filter { task ->
+            task.plannedStart?.let { start ->
+                millisToLocalDate(start) == date
+            } ?: false
+        }
+        val daySessions = filteredSessions.filter { session ->
+            val startDate = millisToLocalDate(session.startTime)
+            val endDate = millisToLocalDate(session.endTime)
+            !startDate.isAfter(date) && !endDate.isBefore(date)
+        }
+
+        Column(
             modifier = Modifier
                 .fillMaxSize()
-                .verticalScroll(scrollState)
+                .pointerInput(date) {
+                    detectHorizontalDragGestures(
+                        onDragStart = { },
+                        onDragEnd = { commitSwipe() },
+                        onDragCancel = { dragOffsetX = 0f },
+                        onHorizontalDrag = { change, dragAmount ->
+                            change.consume()
+                            dragOffsetX += dragAmount
+                        }
+                    )
+                }
+                .offset { IntOffset(dragOffsetX.roundToInt(), 0) }
         ) {
-            DayTimeline(
-                dayTasks = dayTasks,
-                daySessions = daySessions,
-                selectedDate = selectedDate,
-                contexts = contexts,
-                allTasks = tasks,
-                onTaskClick = onTaskClick
+            Text(
+                text = date.format(
+                    DateTimeFormatter.ofPattern("d MMMM yyyy", Locale.getDefault())
+                ),
+                style = MaterialTheme.typography.titleLarge,
+                modifier = Modifier.padding(16.dp)
             )
-        }
+            val scrollState = rememberScrollState()
+            val density = LocalDensity.current
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .verticalScroll(scrollState)
+            ) {
+                DayTimeline(
+                    dayTasks = dayTasks,
+                    daySessions = daySessions,
+                    selectedDate = date,
+                    contexts = contexts,
+                    allTasks = tasks,
+                    onTaskClick = onTaskClick
+                )
+            }
 
-        LaunchedEffect(selectedDate) {
-            val now = LocalTime.now()
-            val minutesSinceMidnight = now.hour * 60 + now.minute
-            val hourHeightPx = with(density) { 60.dp.toPx() }
-            val offsetPx = hourHeightPx * minutesSinceMidnight / 60f
-            val viewHeightPx = hourHeightPx * 24
-            val scrollTarget = (offsetPx - viewHeightPx / 3f).coerceAtLeast(0f)
-            scrollState.scrollTo(scrollTarget.toInt())
+            LaunchedEffect(date) {
+                val now = LocalTime.now()
+                val minutesSinceMidnight = now.hour * 60 + now.minute
+                val hourHeightPx = with(density) { 60.dp.toPx() }
+                val offsetPx = hourHeightPx * minutesSinceMidnight / 60f
+                val viewHeightPx = hourHeightPx * 24
+                val scrollTarget = (offsetPx - viewHeightPx / 3f).coerceAtLeast(0f)
+                scrollState.scrollTo(scrollTarget.toInt())
+            }
         }
+    }
+
+    LaunchedEffect(selectedDate) {
+        animatedDate = selectedDate
     }
 }
 
