@@ -1,13 +1,8 @@
 package com.example.voodoo.presentation.screens
 
-import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.slideInHorizontally
-import androidx.compose.animation.slideOutHorizontally
-import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -49,6 +44,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -89,6 +85,7 @@ import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.time.format.TextStyle
 import java.util.Locale
+import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
 import kotlin.comparisons.compareBy
 
@@ -637,34 +634,62 @@ fun DayView(
     onTaskClick: (Long) -> Unit,
     onSwipeToDate: (LocalDate) -> Unit = {}
 ) {
-    var dragOffsetX by remember { mutableStateOf(0f) }
+    val offsetX = remember { Animatable(0f) }
+    val scope = rememberCoroutineScope()
     val contentWidthPx = with(LocalDensity.current) { LocalConfiguration.current.screenWidthDp.dp.toPx() }
     var animatedDate by remember { mutableStateOf(selectedDate) }
 
-    fun commitSwipe() {
-        if (dragOffsetX < -contentWidthPx * 0.25f) {
-            onSwipeToDate(selectedDate.plusDays(1))
-        } else if (dragOffsetX > contentWidthPx * 0.25f) {
-            onSwipeToDate(selectedDate.minusDays(1))
-        }
-        dragOffsetX = 0f
+    LaunchedEffect(selectedDate) {
+        animatedDate = selectedDate
     }
 
-    AnimatedContent(
-        targetState = animatedDate,
-        transitionSpec = {
-            val direction = if (targetState > initialState) 1 else -1
-            (slideInHorizontally(
-                animationSpec = tween(280, easing = FastOutSlowInEasing),
-                initialOffsetX = { it * direction }
-            ) + fadeIn(animationSpec = tween(280))) togetherWith
-                (slideOutHorizontally(
-                    animationSpec = tween(280, easing = FastOutSlowInEasing),
-                    targetOffsetX = { it * -direction }
-                ) + fadeOut(animationSpec = tween(280)))
-        },
-        contentKey = { it }
-    ) { date ->
+    fun release() {
+        scope.launch {
+            val dragOffset = offsetX.value
+            val direction = when {
+                dragOffset < -contentWidthPx * 0.25f -> 1
+                dragOffset > contentWidthPx * 0.25f -> -1
+                else -> 0
+            }
+            if (direction != 0) {
+                offsetX.animateTo(
+                    -direction * contentWidthPx,
+                    animationSpec = tween(220, easing = FastOutSlowInEasing)
+                )
+                animatedDate = animatedDate.plusDays(direction.toLong())
+                onSwipeToDate(animatedDate)
+                offsetX.snapTo(direction * contentWidthPx)
+                offsetX.animateTo(
+                    0f,
+                    animationSpec = tween(220, easing = FastOutSlowInEasing)
+                )
+            } else {
+                offsetX.animateTo(0f, animationSpec = tween(220, easing = FastOutSlowInEasing))
+            }
+        }
+    }
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .pointerInput(animatedDate) {
+                detectHorizontalDragGestures(
+                    onDragStart = { },
+                    onDragEnd = { release() },
+                    onDragCancel = {
+                        scope.launch { offsetX.animateTo(0f) }
+                    },
+                    onHorizontalDrag = { change, dragAmount ->
+                        change.consume()
+                        scope.launch {
+                            offsetX.snapTo((offsetX.value + dragAmount).coerceIn(-contentWidthPx, contentWidthPx))
+                        }
+                    }
+                )
+            }
+            .offset { IntOffset(offsetX.value.roundToInt(), 0) }
+    ) {
+        val date = animatedDate
         val dayTasks = filteredTasks.filter { task ->
             task.plannedStart?.let { start ->
                 millisToLocalDate(start) == date
@@ -676,60 +701,39 @@ fun DayView(
             !startDate.isAfter(date) && !endDate.isBefore(date)
         }
 
-        Column(
+        Text(
+            text = date.format(
+                DateTimeFormatter.ofPattern("d MMMM yyyy", Locale.getDefault())
+            ),
+            style = MaterialTheme.typography.titleLarge,
+            modifier = Modifier.padding(16.dp)
+        )
+        val scrollState = rememberScrollState()
+        val density = LocalDensity.current
+        Box(
             modifier = Modifier
                 .fillMaxSize()
-                .pointerInput(date) {
-                    detectHorizontalDragGestures(
-                        onDragStart = { },
-                        onDragEnd = { commitSwipe() },
-                        onDragCancel = { dragOffsetX = 0f },
-                        onHorizontalDrag = { change, dragAmount ->
-                            change.consume()
-                            dragOffsetX += dragAmount
-                        }
-                    )
-                }
-                .offset { IntOffset(dragOffsetX.roundToInt(), 0) }
+                .verticalScroll(scrollState)
         ) {
-            Text(
-                text = date.format(
-                    DateTimeFormatter.ofPattern("d MMMM yyyy", Locale.getDefault())
-                ),
-                style = MaterialTheme.typography.titleLarge,
-                modifier = Modifier.padding(16.dp)
+            DayTimeline(
+                dayTasks = dayTasks,
+                daySessions = daySessions,
+                selectedDate = date,
+                contexts = contexts,
+                allTasks = tasks,
+                onTaskClick = onTaskClick
             )
-            val scrollState = rememberScrollState()
-            val density = LocalDensity.current
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .verticalScroll(scrollState)
-            ) {
-                DayTimeline(
-                    dayTasks = dayTasks,
-                    daySessions = daySessions,
-                    selectedDate = date,
-                    contexts = contexts,
-                    allTasks = tasks,
-                    onTaskClick = onTaskClick
-                )
-            }
-
-            LaunchedEffect(date) {
-                val now = LocalTime.now()
-                val minutesSinceMidnight = now.hour * 60 + now.minute
-                val hourHeightPx = with(density) { 60.dp.toPx() }
-                val offsetPx = hourHeightPx * minutesSinceMidnight / 60f
-                val viewHeightPx = hourHeightPx * 24
-                val scrollTarget = (offsetPx - viewHeightPx / 3f).coerceAtLeast(0f)
-                scrollState.scrollTo(scrollTarget.toInt())
-            }
         }
-    }
 
-    LaunchedEffect(selectedDate) {
-        animatedDate = selectedDate
+        LaunchedEffect(date) {
+            val now = LocalTime.now()
+            val minutesSinceMidnight = now.hour * 60 + now.minute
+            val hourHeightPx = with(density) { 60.dp.toPx() }
+            val offsetPx = hourHeightPx * minutesSinceMidnight / 60f
+            val viewHeightPx = hourHeightPx * 24
+            val scrollTarget = (offsetPx - viewHeightPx / 3f).coerceAtLeast(0f)
+            scrollState.scrollTo(scrollTarget.toInt())
+        }
     }
 }
 
