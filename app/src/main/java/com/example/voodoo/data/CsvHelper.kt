@@ -41,7 +41,9 @@ class CsvHelper(private val context: Context) {
                         "id", "contextId", "parentId", "level", "title", "description",
                         "result", "isDone", "priority", "sortOrder", "plannedStart",
                         "plannedEnd", "deadline", "reminderMinutesBefore", "createdAt", "completedAt",
-                        "timerActive", "timerStartedAt"
+                        "timerActive", "timerStartedAt",
+                        "routineFrequency", "routineStartMinutes", "routineEndMinutes",
+                        "routineDayOfWeek", "routineDayOfMonth"
                     ))
                     taskDao.getAllTasksSync().forEach { task ->
                         csvWriter.writeNext(arrayOf(
@@ -62,7 +64,12 @@ class CsvHelper(private val context: Context) {
                             task.createdAt.toString(),
                             task.completedAt?.toString() ?: "",
                             task.timerActive.toString(),
-                            task.timerStartedAt?.toString() ?: ""
+                            task.timerStartedAt?.toString() ?: "",
+                            task.routineFrequency?.toString() ?: "",
+                            task.routineStartMinutes?.toString() ?: "",
+                            task.routineEndMinutes?.toString() ?: "",
+                            task.routineDayOfWeek?.toString() ?: "",
+                            task.routineDayOfMonth?.toString() ?: ""
                         ))
                     }
 
@@ -134,9 +141,9 @@ class CsvHelper(private val context: Context) {
                                         }
                                     }
                                     "tasks" -> {
-                                        // Новый формат (18 колонок) включает deadline, старый (17) — нет.
-                                        // Определяем по длине строки.
+                                        // Форматы: 17 (старый, без deadline), 18 (с deadline), 23 (с рутиной)
                                         val hasDeadline = line.size >= 18
+                                        val hasRoutine = line.size >= 23
                                         tasks.add(Task(
                                             id = line.getOrNull(0)?.toLongOrNull() ?: 0,
                                             contextId = line.getOrNull(1)?.takeIf { it.isNotBlank() }?.toLongOrNull(),
@@ -155,7 +162,12 @@ class CsvHelper(private val context: Context) {
                                             createdAt = if (hasDeadline) (line.getOrNull(14)?.toLongOrNull() ?: System.currentTimeMillis()) else (line.getOrNull(13)?.toLongOrNull() ?: System.currentTimeMillis()),
                                             completedAt = if (hasDeadline) line.getOrNull(15)?.takeIf { it.isNotBlank() }?.toLongOrNull() else line.getOrNull(14)?.takeIf { it.isNotBlank() }?.toLongOrNull(),
                                             timerActive = if (hasDeadline) line.getOrNull(16)?.toBooleanStrictOrNull() ?: false else line.getOrNull(15)?.toBooleanStrictOrNull() ?: false,
-                                            timerStartedAt = if (hasDeadline) line.getOrNull(17)?.takeIf { it.isNotBlank() }?.toLongOrNull() else line.getOrNull(16)?.takeIf { it.isNotBlank() }?.toLongOrNull()
+                                            timerStartedAt = if (hasDeadline) line.getOrNull(17)?.takeIf { it.isNotBlank() }?.toLongOrNull() else line.getOrNull(16)?.takeIf { it.isNotBlank() }?.toLongOrNull(),
+                                            routineFrequency = if (hasRoutine) line.getOrNull(18)?.takeIf { it.isNotBlank() } else null,
+                                            routineStartMinutes = if (hasRoutine) line.getOrNull(19)?.takeIf { it.isNotBlank() }?.toIntOrNull() else null,
+                                            routineEndMinutes = if (hasRoutine) line.getOrNull(20)?.takeIf { it.isNotBlank() }?.toIntOrNull() else null,
+                                            routineDayOfWeek = if (hasRoutine) line.getOrNull(21)?.takeIf { it.isNotBlank() }?.toIntOrNull() else null,
+                                            routineDayOfMonth = if (hasRoutine) line.getOrNull(22)?.takeIf { it.isNotBlank() }?.toIntOrNull() else null
                                         ))
                                     }
                                     "sessions" -> {
