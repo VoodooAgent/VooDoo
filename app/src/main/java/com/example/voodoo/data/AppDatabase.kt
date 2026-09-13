@@ -16,7 +16,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         ICalSyncSetting::class,
         CalendarContextSetting::class
     ],
-    version = 10,  // Обновлено с 9 до 10
+    version = 11,  // Обновлено с 10 до 11
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -243,6 +243,14 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        // НОВАЯ МИГРАЦИЯ 10 -> 11: поля рутины в tasks
+        private val MIGRATION_10_11 = object : Migration(10, 11) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                database.execSQL("ALTER TABLE tasks ADD COLUMN routineFrequency TEXT DEFAULT NULL")
+                database.execSQL("ALTER TABLE tasks ADD COLUMN routineTimeMinutes INTEGER DEFAULT NULL")
+            }
+        }
+
         fun getDatabase(context: Context): AppDatabase {
             return INSTANCE ?: synchronized(this) {
                 val instance = Room.databaseBuilder(
@@ -250,7 +258,7 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "voodoo_database"
                 )
-                    .addMigrations(MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10)
+                    .addMigrations(MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11)
                     .build()
                 INSTANCE = instance
                 instance

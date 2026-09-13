@@ -134,6 +134,9 @@ interface TaskDao {
     @Query("UPDATE tasks SET timerActive = :active, timerStartedAt = :startedAt WHERE id = :taskId")
     suspend fun updateTimerStatus(taskId: Long, active: Boolean, startedAt: Long?)
 
+    @Query("UPDATE tasks SET routineFrequency = :frequency, routineTimeMinutes = :timeMinutes WHERE id = :taskId")
+    suspend fun updateRoutineSettings(taskId: Long, frequency: String?, timeMinutes: Int?)
+
     @Query("""
         UPDATE tasks 
         SET parentId = NULL, level = 0 
@@ -178,6 +181,12 @@ interface TimerSessionDao {
 
     @Query("SELECT * FROM timer_sessions WHERE taskId = :taskId ORDER BY startTime DESC")
     suspend fun getSessionsByTaskSync(taskId: Long): List<TimerSession>
+
+    @Query("SELECT * FROM timer_sessions WHERE taskId = :taskId AND startTime >= :dayStart AND startTime < :dayEnd ORDER BY startTime DESC")
+    suspend fun getSessionsForDay(taskId: Long, dayStart: Long, dayEnd: Long): List<TimerSession>
+
+    @Query("SELECT * FROM timer_sessions WHERE taskId = :taskId AND startTime >= :dayStart AND startTime < :dayEnd ORDER BY startTime DESC")
+    fun getSessionsForDayFlow(taskId: Long, dayStart: Long, dayEnd: Long): Flow<List<TimerSession>>
 
     @Query("SELECT * FROM timer_sessions ORDER BY startTime DESC")
     suspend fun getAllTimerSessionsSync(): List<TimerSession>

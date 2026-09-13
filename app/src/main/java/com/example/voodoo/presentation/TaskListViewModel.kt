@@ -17,6 +17,7 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.util.Calendar
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class TaskListViewModel(application: Application) : AndroidViewModel(application) {
@@ -65,6 +66,21 @@ class TaskListViewModel(application: Application) : AndroidViewModel(application
 
     val activeTimerTasks: StateFlow<List<Task>> = taskDao.getActiveTimerTasksFlow()
         .stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
+
+    // Рутина: какие задачи выполнены сегодня (есть сессии за сегодня)
+    val routineDoneToday: StateFlow<Set<Long>> = sessionDao.getAllSessions()
+        .map { sessions ->
+            val now = System.currentTimeMillis()
+            val cal = Calendar.getInstance().apply { timeInMillis = now }
+            cal.set(Calendar.HOUR_OF_DAY, 0)
+            cal.set(Calendar.MINUTE, 0)
+            cal.set(Calendar.SECOND, 0)
+            cal.set(Calendar.MILLISECOND, 0)
+            val dayStart = cal.timeInMillis
+            val dayEnd = dayStart + 24 * 60 * 60 * 1000L
+            sessions.filter { it.startTime in dayStart until dayEnd }.map { it.taskId }.toSet()
+        }
+        .stateIn(viewModelScope, SharingStarted.Lazily, emptySet())
 
     fun selectContext(contextId: Long?) {
         _selectedContextId.value = contextId
@@ -498,5 +514,35 @@ class TaskListViewModel(application: Application) : AndroidViewModel(application
 
     fun getTasksWithDeadlineWithoutContext(): Flow<List<Task>> {
         return taskDao.getTasksWithDeadlineWithoutContext()
+    }
+
+    // Рутина: проверка выполнена ли задача сегодня
+    fun isRoutineDoneToday(taskId: Long): Flow<Boolean> {
+        val now = System.currentTimeMillis()
+        val cal = Calendar.getInstance().apply { timeInMillis = now }
+        cal.set(Calendar.HOUR_OF_DAY, 0)
+        cal.set(Calendar.MINUTE, 0)
+        cal.set(Calendar.SECOND, 0)
+        cal.set(Calendar.MILLISECOND, 0)
+        val dayStart = cal.timeInMillis
+        val dayEnd = dayStart + 24 * 60 * 60 * 1000L
+        return sessionDao.getSessionsForDayFlow(taskId, dayStart, dayEnd)
+            .map { it.isNotEmpty() }
+    }
+
+    suspend fun getRoutineSessionDurationToday(taskId: Long): Long {
+        val now = System.currentTimeMillis()
+        val cal = Calendar.getInstance().apply { timeInMillis = now }
+        cal.set(Calendar.HOUR_OF_DAY, 0)
+        cal.set(Calendar.MINUTE, 0)
+        cal.set(Calendar.SECOND, 0)
+        cal.set(Calendar.MILLISECOND, 0)
+        val dayStart = cal.timeInMillis
+        val dayEnd = dayStart + 24 * 60 * 60 * 1000L
+        return sessionDao.getSessionsForDay(taskId, dayStart, dayEnd).sumOf { it.duration }
+    }
+
+    suspend fun updateRoutineSettings(taskId: Long, frequency: String?, timeMinutes: Int?) {
+        taskDao.updateRoutineSettings(taskId, frequency, timeMinutes)
     }
 }

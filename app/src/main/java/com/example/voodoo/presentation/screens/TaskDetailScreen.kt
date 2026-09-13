@@ -49,6 +49,8 @@ fun TaskDetailScreen(
     var plannedEnd by remember { mutableStateOf<Long?>(null) }
     var deadline by remember { mutableStateOf<Long?>(null) }
     var reminderMinutes by remember { mutableStateOf<Int?>(null) }
+    var routineFrequency by remember { mutableStateOf<String?>(null) }
+    var routineTimeMinutes by remember { mutableStateOf<Int?>(null) }
     var isInitialized by remember { mutableStateOf(false) }
     var showStartDatePicker by remember { mutableStateOf(false) }
     var showEndDatePicker by remember { mutableStateOf(false) }
@@ -75,6 +77,8 @@ fun TaskDetailScreen(
                 plannedEnd = t.plannedEnd
                 deadline = t.deadline
                 reminderMinutes = t.reminderMinutesBefore
+                routineFrequency = t.routineFrequency
+                routineTimeMinutes = t.routineTimeMinutes
                 isInitialized = true
             }
         }
@@ -90,7 +94,9 @@ fun TaskDetailScreen(
                     plannedStart = plannedStart,
                     plannedEnd = plannedEnd,
                     deadline = deadline,
-                    reminderMinutesBefore = reminderMinutes
+                    reminderMinutesBefore = reminderMinutes,
+                    routineFrequency = routineFrequency,
+                    routineTimeMinutes = routineTimeMinutes
                 )
             )
         }
@@ -344,6 +350,67 @@ fun TaskDetailScreen(
                                 IconButton(onClick = { deadline = null }) {
                                     Icon(Icons.Default.Close, contentDescription = "Очистить дедлайн")
                                 }
+                            }
+                        }
+                    }
+                }
+
+                // Рутинные настройки
+                if (currentTask.priority == 4) {
+                    Card(modifier = Modifier.fillMaxWidth()) {
+                        Column(modifier = Modifier.padding(16.dp)) {
+                            Text("Рутина", style = MaterialTheme.typography.titleMedium)
+                            Spacer(modifier = Modifier.height(12.dp))
+                            Text("Периодичность:", style = MaterialTheme.typography.labelMedium)
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                val frequencies = listOf("daily" to "Каждый день", "weekly" to "Каждую неделю", "monthly" to "Каждый месяц")
+                                frequencies.forEach { (value, label) ->
+                                    FilterChip(
+                                        selected = routineFrequency == value,
+                                        onClick = {
+                                            routineFrequency = value
+                                            listViewModel.updateTask(currentTask.copy(routineFrequency = value, routineTimeMinutes = routineTimeMinutes))
+                                        },
+                                        label = { Text(label) }
+                                    )
+                                }
+                            }
+                            Spacer(modifier = Modifier.height(12.dp))
+                            Text("Время выполнения:", style = MaterialTheme.typography.labelMedium)
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                OutlinedTextField(
+                                    value = (routineTimeMinutes?.div(60) ?: 0).toString(),
+                                    onValueChange = { value ->
+                                        val h = value.filter { it.isDigit() }.take(2).toIntOrNull()?.coerceIn(0, 23) ?: 0
+                                        val newMinutes = h * 60 + (routineTimeMinutes?.mod(60) ?: 0)
+                                        routineTimeMinutes = newMinutes
+                                        listViewModel.updateTask(currentTask.copy(routineTimeMinutes = newMinutes))
+                                    },
+                                    modifier = Modifier.width(72.dp),
+                                    singleLine = true,
+                                    label = { Text("Час") }
+                                )
+                                Text(":")
+                                OutlinedTextField(
+                                    value = (routineTimeMinutes?.mod(60) ?: 0).toString(),
+                                    onValueChange = { value ->
+                                        val m = value.filter { it.isDigit() }.take(2).toIntOrNull()?.coerceIn(0, 59) ?: 0
+                                        val newMinutes = (routineTimeMinutes?.div(60) ?: 0) * 60 + m
+                                        routineTimeMinutes = newMinutes
+                                        listViewModel.updateTask(currentTask.copy(routineTimeMinutes = newMinutes))
+                                    },
+                                    modifier = Modifier.width(72.dp),
+                                    singleLine = true,
+                                    label = { Text("Мин") }
+                                )
                             }
                         }
                     }

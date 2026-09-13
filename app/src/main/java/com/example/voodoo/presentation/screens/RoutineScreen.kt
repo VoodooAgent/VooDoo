@@ -54,11 +54,12 @@ fun RoutineScreen(
     val contexts by taskListViewModel.contexts.collectAsState()
     val settings by mainViewModel.settings.collectAsState()
     val durations by taskListViewModel.taskDurations.collectAsState()
+    val routineDoneToday by taskListViewModel.routineDoneToday.collectAsState()
 
     var showSwipeMenu by remember { mutableStateOf<Task?>(null) }
 
     val activeRoutineTasks = remember(routineTasks) {
-        routineTasks.filter { !it.isDone }.sortedBy { it.routineSortOrder ?: it.sortOrder }
+        routineTasks.filter { !it.isDone }.sortedBy { it.routineTimeMinutes ?: 0 }
     }
 
     val tasksByContext = activeRoutineTasks.groupBy { it.contextId }
@@ -143,6 +144,7 @@ fun RoutineScreen(
                                     collapsedContexts + contextId
                                 }
                             },
+                            doneToday = routineDoneToday,
                             viewModel = taskListViewModel,
                             onTaskClick = onTaskClick,
                             onSwipeLeft = { task -> showSwipeMenu = task }
@@ -151,18 +153,13 @@ fun RoutineScreen(
                 }
             } else {
                 items(activeRoutineTasks, key = { "routine_${it.id}" }) { task ->
-                    TaskCard(
+                    RoutineTaskRow(
                         task = task,
-                        pastSessionsDuration = durations[task.id] ?: 0L,
+                        doneToday = task.id in routineDoneToday,
+                        durations = durations,
                         fontSize = settings.fontSize,
-                        onToggleDone = { taskListViewModel.requestComplete(task) },
-                        onCyclePriority = { taskListViewModel.cyclePriority(task) },
-                        onToggleTimer = {
-                            if (task.timerActive) taskListViewModel.pauseTimer(task)
-                            else taskListViewModel.startTimer(task)
-                        },
-                        onClick = { onTaskClick(task.id) },
-                        onSwipeRight = { taskListViewModel.requestComplete(task) },
+                        viewModel = taskListViewModel,
+                        onTaskClick = onTaskClick,
                         onSwipeLeft = { showSwipeMenu = task }
                     )
                 }
@@ -205,6 +202,7 @@ fun RoutineContextSection(
     fontSize: Int,
     expanded: Boolean,
     onToggleExpanded: () -> Unit,
+    doneToday: Set<Long>,
     viewModel: TaskListViewModel,
     onTaskClick: (Long) -> Unit,
     onSwipeLeft: (Task) -> Unit
@@ -234,23 +232,58 @@ fun RoutineContextSection(
                     verticalArrangement = Arrangement.spacedBy(2.dp)
                 ) {
                     tasks.forEach { task ->
-                        TaskCard(
+                        RoutineTaskRow(
                             task = task,
-                            pastSessionsDuration = durations[task.id] ?: 0L,
+                            doneToday = task.id in doneToday,
+                            durations = durations,
                             fontSize = fontSize,
-                            onToggleDone = { viewModel.requestComplete(task) },
-                            onCyclePriority = { viewModel.cyclePriority(task) },
-                            onToggleTimer = {
-                                if (task.timerActive) viewModel.pauseTimer(task)
-                                else viewModel.startTimer(task)
-                            },
-                            onClick = { onTaskClick(task.id) },
-                            onSwipeRight = { viewModel.requestComplete(task) },
-                            onSwipeLeft = { onSwipeLeft(task) }
+                            viewModel = viewModel,
+                            onTaskClick = onTaskClick,
+                            onSwipeLeft = onSwipeLeft
                         )
                     }
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun RoutineTaskRow(
+    task: Task,
+    doneToday: Boolean,
+    durations: Map<Long, Long>,
+    fontSize: Int,
+    viewModel: TaskListViewModel,
+    onTaskClick: (Long) -> Unit,
+    onSwipeLeft: (Task) -> Unit
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Checkbox(
+            checked = doneToday,
+            onCheckedChange = null,
+            enabled = false,
+            modifier = Modifier.size(24.dp)
+        )
+        Spacer(modifier = Modifier.width(4.dp))
+        Box(modifier = Modifier.weight(1f)) {
+            TaskCard(
+                task = task,
+                pastSessionsDuration = durations[task.id] ?: 0L,
+                fontSize = fontSize,
+                onToggleDone = { viewModel.requestComplete(task) },
+                onCyclePriority = { viewModel.cyclePriority(task) },
+                onToggleTimer = {
+                    if (task.timerActive) viewModel.pauseTimer(task)
+                    else viewModel.startTimer(task)
+                },
+                onClick = { onTaskClick(task.id) },
+                onSwipeRight = { viewModel.requestComplete(task) },
+                onSwipeLeft = { onSwipeLeft(task) }
+            )
         }
     }
 }
