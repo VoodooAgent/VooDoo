@@ -235,24 +235,47 @@ fun TaskDetailScreen(
                         Spacer(modifier = Modifier.height(12.dp))
                         Text("Начало:", style = MaterialTheme.typography.labelMedium)
                         Spacer(modifier = Modifier.height(4.dp))
-                        OutlinedButton(
-                            onClick = { showStartDatePicker = true },
-                            modifier = Modifier.fillMaxWidth()
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Icon(Icons.Default.Event, contentDescription = null)
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text(plannedStart?.let { detailViewModel.formatDateTime(it) } ?: "Не задано")
+                            OutlinedButton(
+                                onClick = { showStartDatePicker = true },
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Icon(Icons.Default.Event, contentDescription = null)
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(plannedStart?.let { detailViewModel.formatDateTime(it) } ?: "Не задано")
+                            }
+                            if (plannedStart != null) {
+                                IconButton(onClick = {
+                                    plannedStart = null
+                                    reminderMinutes = null
+                                }) {
+                                    Icon(Icons.Default.Close, contentDescription = "Очистить начало")
+                                }
+                            }
                         }
                         Spacer(modifier = Modifier.height(8.dp))
                         Text("Конец:", style = MaterialTheme.typography.labelMedium)
                         Spacer(modifier = Modifier.height(4.dp))
-                        OutlinedButton(
-                            onClick = { showEndDatePicker = true },
-                            modifier = Modifier.fillMaxWidth()
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Icon(Icons.Default.Event, contentDescription = null)
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text(plannedEnd?.let { detailViewModel.formatDateTime(it) } ?: "Не задано")
+                            OutlinedButton(
+                                onClick = { showEndDatePicker = true },
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Icon(Icons.Default.Event, contentDescription = null)
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(plannedEnd?.let { detailViewModel.formatDateTime(it) } ?: "Не задано")
+                            }
+                            if (plannedEnd != null) {
+                                IconButton(onClick = { plannedEnd = null }) {
+                                    Icon(Icons.Default.Close, contentDescription = "Очистить конец")
+                                }
+                            }
                         }
 
                         if (plannedStart != null) {
@@ -305,13 +328,23 @@ fun TaskDetailScreen(
                         Spacer(modifier = Modifier.height(12.dp))
                         Text("Дедлайн:", style = MaterialTheme.typography.labelMedium)
                         Spacer(modifier = Modifier.height(4.dp))
-                        OutlinedButton(
-                            onClick = { showDeadlineDatePicker = true },
-                            modifier = Modifier.fillMaxWidth()
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Icon(Icons.Default.Event, contentDescription = null)
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text(deadline?.let { detailViewModel.formatDateTime(it) } ?: "Не задано")
+                            OutlinedButton(
+                                onClick = { showDeadlineDatePicker = true },
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Icon(Icons.Default.Event, contentDescription = null)
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(deadline?.let { detailViewModel.formatDateTime(it) } ?: "Не задано")
+                            }
+                            if (deadline != null) {
+                                IconButton(onClick = { deadline = null }) {
+                                    Icon(Icons.Default.Close, contentDescription = "Очистить дедлайн")
+                                }
+                            }
                         }
                     }
                 }
