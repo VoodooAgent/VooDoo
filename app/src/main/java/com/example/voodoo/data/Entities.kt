@@ -61,7 +61,8 @@ data class Task(
     val plannedEnd: Long? = null,
     val deadline: Long? = null,  // НОВОЕ: дедлайн
     val routineFrequency: String? = null,  // "daily", "weekly", "monthly" — для рутинных задач
-    val routineTimeMinutes: Int? = null,  // время выполнения в минутах от 0:00
+    val routineStartMinutes: Int? = null,  // время начала в минутах от 0:00
+    val routineEndMinutes: Int? = null,  // время окончания в минутах от 0:00
     val reminderMinutesBefore: Int? = null,
     val createdAt: Long = System.currentTimeMillis(),
     val completedAt: Long? = null,

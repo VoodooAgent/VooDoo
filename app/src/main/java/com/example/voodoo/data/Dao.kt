@@ -134,8 +134,14 @@ interface TaskDao {
     @Query("UPDATE tasks SET timerActive = :active, timerStartedAt = :startedAt WHERE id = :taskId")
     suspend fun updateTimerStatus(taskId: Long, active: Boolean, startedAt: Long?)
 
-    @Query("UPDATE tasks SET routineFrequency = :frequency, routineTimeMinutes = :timeMinutes WHERE id = :taskId")
-    suspend fun updateRoutineSettings(taskId: Long, frequency: String?, timeMinutes: Int?)
+    @Query("UPDATE tasks SET routineFrequency = :frequency WHERE id = :taskId")
+    suspend fun updateRoutineFrequency(taskId: Long, frequency: String?)
+
+    @Query("UPDATE tasks SET routineStartMinutes = :minutes WHERE id = :taskId")
+    suspend fun updateRoutineStartMinutes(taskId: Long, minutes: Int?)
+
+    @Query("UPDATE tasks SET routineEndMinutes = :minutes WHERE id = :taskId")
+    suspend fun updateRoutineEndMinutes(taskId: Long, minutes: Int?)
 
     @Query("""
         UPDATE tasks 

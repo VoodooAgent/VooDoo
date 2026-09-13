@@ -247,7 +247,8 @@ abstract class AppDatabase : RoomDatabase() {
         private val MIGRATION_10_11 = object : Migration(10, 11) {
             override fun migrate(database: SupportSQLiteDatabase) {
                 database.execSQL("ALTER TABLE tasks ADD COLUMN routineFrequency TEXT DEFAULT NULL")
-                database.execSQL("ALTER TABLE tasks ADD COLUMN routineTimeMinutes INTEGER DEFAULT NULL")
+                database.execSQL("ALTER TABLE tasks ADD COLUMN routineStartMinutes INTEGER DEFAULT NULL")
+                database.execSQL("ALTER TABLE tasks ADD COLUMN routineEndMinutes INTEGER DEFAULT NULL")
             }
         }
 
@@ -259,6 +260,7 @@ abstract class AppDatabase : RoomDatabase() {
                     "voodoo_database"
                 )
                     .addMigrations(MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11)
+                    .fallbackToDestructiveMigration()
                     .build()
                 INSTANCE = instance
                 instance

@@ -2,6 +2,7 @@ package com.example.voodoo.presentation.screens
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -17,6 +18,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material3.Card
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -59,7 +61,7 @@ fun RoutineScreen(
     var showSwipeMenu by remember { mutableStateOf<Task?>(null) }
 
     val activeRoutineTasks = remember(routineTasks) {
-        routineTasks.filter { !it.isDone }.sortedBy { it.routineTimeMinutes ?: 0 }
+        routineTasks.filter { !it.isDone }.sortedBy { it.routineStartMinutes ?: 0 }
     }
 
     val tasksByContext = activeRoutineTasks.groupBy { it.contextId }

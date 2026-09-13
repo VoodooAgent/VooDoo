@@ -50,7 +50,8 @@ fun TaskDetailScreen(
     var deadline by remember { mutableStateOf<Long?>(null) }
     var reminderMinutes by remember { mutableStateOf<Int?>(null) }
     var routineFrequency by remember { mutableStateOf<String?>(null) }
-    var routineTimeMinutes by remember { mutableStateOf<Int?>(null) }
+    var routineStartMinutes by remember { mutableStateOf<Int?>(null) }
+    var routineEndMinutes by remember { mutableStateOf<Int?>(null) }
     var isInitialized by remember { mutableStateOf(false) }
     var showStartDatePicker by remember { mutableStateOf(false) }
     var showEndDatePicker by remember { mutableStateOf(false) }
@@ -78,7 +79,8 @@ fun TaskDetailScreen(
                 deadline = t.deadline
                 reminderMinutes = t.reminderMinutesBefore
                 routineFrequency = t.routineFrequency
-                routineTimeMinutes = t.routineTimeMinutes
+                routineStartMinutes = t.routineStartMinutes
+                routineEndMinutes = t.routineEndMinutes
                 isInitialized = true
             }
         }
@@ -96,7 +98,8 @@ fun TaskDetailScreen(
                     deadline = deadline,
                     reminderMinutesBefore = reminderMinutes,
                     routineFrequency = routineFrequency,
-                    routineTimeMinutes = routineTimeMinutes
+                    routineStartMinutes = routineStartMinutes,
+                    routineEndMinutes = routineEndMinutes
                 )
             )
         }
@@ -355,7 +358,7 @@ fun TaskDetailScreen(
                     }
                 }
 
-                // Рутинные настройки
+// Рутинные настройки
                 if (currentTask.priority == 4) {
                     Card(modifier = Modifier.fillMaxWidth()) {
                         Column(modifier = Modifier.padding(16.dp)) {
@@ -365,56 +368,74 @@ fun TaskDetailScreen(
                             Spacer(modifier = Modifier.height(4.dp))
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                horizontalArrangement = Arrangement.spacedBy(4.dp)
                             ) {
-                                val frequencies = listOf("daily" to "Каждый день", "weekly" to "Каждую неделю", "monthly" to "Каждый месяц")
-                                frequencies.forEach { (value, label) ->
+                                listOf("daily" to "День", "weekly" to "Неделя", "monthly" to "Месяц").forEach { (value, label) ->
                                     FilterChip(
                                         selected = routineFrequency == value,
                                         onClick = {
                                             routineFrequency = value
-                                            listViewModel.updateTask(currentTask.copy(routineFrequency = value, routineTimeMinutes = routineTimeMinutes))
+                                            listViewModel.updateTask(currentTask.copy(routineFrequency = value))
                                         },
-                                        label = { Text(label) }
+                                        label = { Text(label, maxLines = 1) }
                                     )
                                 }
                             }
                             Spacer(modifier = Modifier.height(12.dp))
-                            Text("Время выполнения:", style = MaterialTheme.typography.labelMedium)
+                            Text("Начало:", style = MaterialTheme.typography.labelMedium)
                             Spacer(modifier = Modifier.height(4.dp))
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
                                 OutlinedTextField(
-                                    value = (routineTimeMinutes?.div(60) ?: 0).toString(),
-                                    onValueChange = { value ->
-                                        val h = value.filter { it.isDigit() }.take(2).toIntOrNull()?.coerceIn(0, 23) ?: 0
-                                        val newMinutes = h * 60 + (routineTimeMinutes?.mod(60) ?: 0)
-                                        routineTimeMinutes = newMinutes
-                                        listViewModel.updateTask(currentTask.copy(routineTimeMinutes = newMinutes))
+                                    value = (routineStartMinutes?.div(60) ?: 0).toString(),
+                                    onValueChange = { v ->
+                                        val h = v.filter { it.isDigit() }.take(2).toIntOrNull()?.coerceIn(0, 23) ?: 0
+                                        routineStartMinutes = h * 60 + (routineStartMinutes?.mod(60) ?: 0)
+                                        listViewModel.updateTask(currentTask.copy(routineStartMinutes = routineStartMinutes))
                                     },
-                                    modifier = Modifier.width(72.dp),
-                                    singleLine = true,
+                                    modifier = Modifier.width(72.dp), singleLine = true,
                                     label = { Text("Час") }
                                 )
                                 Text(":")
                                 OutlinedTextField(
-                                    value = (routineTimeMinutes?.mod(60) ?: 0).toString(),
-                                    onValueChange = { value ->
-                                        val m = value.filter { it.isDigit() }.take(2).toIntOrNull()?.coerceIn(0, 59) ?: 0
-                                        val newMinutes = (routineTimeMinutes?.div(60) ?: 0) * 60 + m
-                                        routineTimeMinutes = newMinutes
-                                        listViewModel.updateTask(currentTask.copy(routineTimeMinutes = newMinutes))
+                                    value = (routineStartMinutes?.mod(60) ?: 0).toString(),
+                                    onValueChange = { v ->
+                                        val m = v.filter { it.isDigit() }.take(2).toIntOrNull()?.coerceIn(0, 59) ?: 0
+                                        routineStartMinutes = (routineStartMinutes?.div(60) ?: 0) * 60 + m
+                                        listViewModel.updateTask(currentTask.copy(routineStartMinutes = routineStartMinutes))
                                     },
-                                    modifier = Modifier.width(72.dp),
-                                    singleLine = true,
+                                    modifier = Modifier.width(72.dp), singleLine = true,
+                                    label = { Text("Мин") }
+                                )
+                            }
+                            Spacer(modifier = Modifier.height(12.dp))
+                            Text("Конец:", style = MaterialTheme.typography.labelMedium)
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                OutlinedTextField(
+                                    value = (routineEndMinutes?.div(60) ?: 0).toString(),
+                                    onValueChange = { v ->
+                                        val h = v.filter { it.isDigit() }.take(2).toIntOrNull()?.coerceIn(0, 23) ?: 0
+                                        routineEndMinutes = h * 60 + (routineEndMinutes?.mod(60) ?: 0)
+                                        listViewModel.updateTask(currentTask.copy(routineEndMinutes = routineEndMinutes))
+                                    },
+                                    modifier = Modifier.width(72.dp), singleLine = true,
+                                    label = { Text("Час") }
+                                )
+                                Text(":")
+                                OutlinedTextField(
+                                    value = (routineEndMinutes?.mod(60) ?: 0).toString(),
+                                    onValueChange = { v ->
+                                        val m = v.filter { it.isDigit() }.take(2).toIntOrNull()?.coerceIn(0, 59) ?: 0
+                                        routineEndMinutes = (routineEndMinutes?.div(60) ?: 0) * 60 + m
+                                        listViewModel.updateTask(currentTask.copy(routineEndMinutes = routineEndMinutes))
+                                    },
+                                    modifier = Modifier.width(72.dp), singleLine = true,
                                     label = { Text("Мин") }
                                 )
                             }
                         }
                     }
-                }
+}
 
                 // Временные метки
                 Card(modifier = Modifier.fillMaxWidth()) {

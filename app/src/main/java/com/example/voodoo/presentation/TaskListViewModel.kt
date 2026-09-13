@@ -542,7 +542,15 @@ class TaskListViewModel(application: Application) : AndroidViewModel(application
         return sessionDao.getSessionsForDay(taskId, dayStart, dayEnd).sumOf { it.duration }
     }
 
-    suspend fun updateRoutineSettings(taskId: Long, frequency: String?, timeMinutes: Int?) {
-        taskDao.updateRoutineSettings(taskId, frequency, timeMinutes)
+    suspend fun updateRoutineFrequency(taskId: Long, frequency: String?) {
+        taskDao.updateRoutineFrequency(taskId, frequency)
+    }
+
+    suspend fun updateRoutineStartMinutes(taskId: Long, minutes: Int?) {
+        taskDao.updateRoutineStartMinutes(taskId, minutes)
+    }
+
+    suspend fun updateRoutineEndMinutes(taskId: Long, minutes: Int?) {
+        taskDao.updateRoutineEndMinutes(taskId, minutes)
     }
 }
