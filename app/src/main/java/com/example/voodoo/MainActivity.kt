@@ -124,7 +124,14 @@ fun VooDooNavHost(viewModel: MainViewModel) {
                 onPriorityClick = { navController.navigate("priority") },
                 onRoutineClick = { navController.navigate("routine") },
                 onActiveTimerClick = { navController.navigate("active_timer") },
-                onCalendarClick = { navController.navigate("calendar") }
+                onCalendarClick = { navController.navigate("calendar") },
+                onSearchClick = { navController.navigate("search") }
+            )
+        }
+        composable("search") {
+            SearchScreen(
+                onBackClick = { navController.popBackStack() },
+                onTaskClick = { taskId -> navController.navigate("task/$taskId") }
             )
         }
         composable(

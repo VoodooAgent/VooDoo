@@ -38,6 +38,7 @@ fun HomeScreen(
     onRoutineClick: () -> Unit = {},
     onActiveTimerClick: () -> Unit = {},
     onCalendarClick: () -> Unit = {},
+    onSearchClick: () -> Unit = {},
     contextViewModel: ContextListViewModel = viewModel(),
     mainViewModel: MainViewModel = viewModel()
 ) {
@@ -61,6 +62,13 @@ fun HomeScreen(
                     }
                 },
                 actions = {
+                    // Поиск
+                    IconButton(onClick = onSearchClick) {
+                        Text(
+                            text = "🔍",
+                            style = MaterialTheme.typography.titleMedium
+                        )
+                    }
                     // Календарь
                     IconButton(onClick = onCalendarClick) {
                         Text(
