@@ -143,10 +143,10 @@ fun calculateEventLayouts(
 private fun effectiveEndMinutes(event: TimelineEvent, minDurationMinutes: Int): Int {
     val startMinutes = event.startTime.hour * 60 + event.startTime.minute
     val endMinutes = event.endTime.hour * 60 + event.endTime.minute
-    val duration = if (endMinutes > startMinutes) {
-        endMinutes - startMinutes
-    } else {
-        24 * 60 - startMinutes + endMinutes
+    val duration = when {
+        endMinutes > startMinutes -> endMinutes - startMinutes
+        endMinutes < startMinutes -> 24 * 60 - startMinutes + endMinutes
+        else -> minDurationMinutes
     }
     return startMinutes + maxOf(duration, minDurationMinutes)
 }
@@ -888,10 +888,10 @@ fun DayTimeline(
             val event = layoutEvent.event
             val startMinutes = event.startTime.hour * 60 + event.startTime.minute
             val rawEndMinutes = event.endTime.hour * 60 + event.endTime.minute
-            val durationMinutes = if (rawEndMinutes > startMinutes) {
-                rawEndMinutes - startMinutes
-            } else {
-                24 * 60 - startMinutes
+            val durationMinutes = when {
+                rawEndMinutes > startMinutes -> rawEndMinutes - startMinutes
+                rawEndMinutes < startMinutes -> 24 * 60 - startMinutes + rawEndMinutes
+                else -> MIN_CARD_HEIGHT_MINUTES
             }
 
             val topOffsetDp = (hourHeightDp * startMinutes / 60f)
