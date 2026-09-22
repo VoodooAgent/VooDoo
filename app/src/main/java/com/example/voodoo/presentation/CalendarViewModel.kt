@@ -84,6 +84,7 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
 
     fun isRoutineScheduledOnDate(task: Task, date: LocalDate): Boolean {
         if (task.priority != 4 || task.routineFrequency == null) return false
+        if (date.isBefore(Instant.ofEpochMilli(task.createdAt).atZone(ZoneId.systemDefault()).toLocalDate())) return false
         return when (task.routineFrequency) {
             "daily" -> true
             "weekly" -> {

@@ -832,6 +832,7 @@ fun DayTimeline(
         val routineEvents = allTasks.filter { task ->
             task.priority == 4 && !task.isDone &&
             task.routineFrequency != null && task.routineStartMinutes != null && task.routineEndMinutes != null &&
+            !selectedDate.isBefore(millisToLocalDate(task.createdAt)) &&
             when (task.routineFrequency) {
                 "daily" -> true
                 "weekly" -> (task.routineDayOfWeek ?: return@filter false) == selectedDate.dayOfWeek.value
