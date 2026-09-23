@@ -42,6 +42,9 @@ import com.example.voodoo.presentation.MainViewModel
 import com.example.voodoo.presentation.TaskListViewModel
 import com.example.voodoo.presentation.components.TaskCard
 import com.example.voodoo.presentation.components.TaskSwipeMenu
+import java.time.Instant
+import java.time.LocalDate
+import java.time.ZoneId
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -61,7 +64,9 @@ fun RoutineScreen(
     var showSwipeMenu by remember { mutableStateOf<Task?>(null) }
 
     val activeRoutineTasks = remember(routineTasks) {
-        routineTasks.filter { !it.isDone }.sortedBy { it.routineStartMinutes ?: 0 }
+        val today = LocalDate.now()
+        routineTasks.filter { !it.isDone && isRoutineScheduledToday(it, today) }
+            .sortedBy { it.routineStartMinutes ?: 0 }
     }
 
     val tasksByContext = activeRoutineTasks.groupBy { it.contextId }
@@ -287,5 +292,17 @@ private fun RoutineTaskRow(
                 onSwipeLeft = { onSwipeLeft(task) }
             )
         }
+    }
+}
+
+private fun isRoutineScheduledToday(task: Task, date: LocalDate): Boolean {
+    if (task.routineFrequency == null) return false
+    val createdAt = Instant.ofEpochMilli(task.createdAt).atZone(ZoneId.systemDefault()).toLocalDate()
+    if (date.isBefore(createdAt)) return false
+    return when (task.routineFrequency) {
+        "daily" -> true
+        "weekly" -> (task.routineDayOfWeek ?: return false) == date.dayOfWeek.value
+        "monthly" -> (task.routineDayOfMonth ?: return false) == date.dayOfMonth
+        else -> false
     }
 }
