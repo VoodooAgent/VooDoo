@@ -181,6 +181,28 @@ interface TaskDao {
     """)
     suspend fun countActiveDescendants(parentId: Long): Int
 
+    // Сколько всего потомков (включая выполненные) будет удалено вместе с задачей
+    @Query("""
+        WITH RECURSIVE descendants(id) AS (
+            SELECT id FROM tasks WHERE parentId = :parentId
+            UNION ALL
+            SELECT t.id FROM tasks t INNER JOIN descendants d ON t.parentId = d.id
+        )
+        SELECT COUNT(*) FROM descendants
+    """)
+    suspend fun countAllDescendants(parentId: Long): Int
+
+    // Задача и все её потомки с запущенным таймером
+    @Query("""
+        WITH RECURSIVE subtree(id) AS (
+            SELECT :taskId
+            UNION ALL
+            SELECT t.id FROM tasks t INNER JOIN subtree s ON t.parentId = s.id
+        )
+        SELECT COUNT(*) FROM tasks WHERE id IN (SELECT id FROM subtree) AND timerActive = 1
+    """)
+    suspend fun countActiveTimersInSubtree(taskId: Long): Int
+
     // НОВОЕ: массовое обновление sortOrder для ребаланса
     @Query("UPDATE tasks SET sortOrder = sortOrder * 10000 WHERE contextId = :contextId")
     suspend fun rebalanceSortOrder(contextId: Long)
@@ -220,6 +242,18 @@ interface TimerSessionDao {
 
     @Delete
     suspend fun delete(session: TimerSession)
+
+    // Сессии задачи и всех её потомков: количество и суммарная длительность
+    @Query("""
+        WITH RECURSIVE subtree(id) AS (
+            SELECT :taskId
+            UNION ALL
+            SELECT t.id FROM tasks t INNER JOIN subtree s ON t.parentId = s.id
+        )
+        SELECT COUNT(*) AS count, COALESCE(SUM(duration), 0) AS totalDuration
+        FROM timer_sessions WHERE taskId IN (SELECT id FROM subtree)
+    """)
+    suspend fun getSubtreeSessionStats(taskId: Long): SessionStats
 
     @Query("DELETE FROM timer_sessions WHERE taskId = :taskId")
     suspend fun deleteSessionsByTask(taskId: Long)
@@ -278,3 +312,8 @@ interface CalendarContextDao {
     @Query("DELETE FROM calendar_context_settings WHERE contextId = :contextId")
     suspend fun deleteByContextId(contextId: Long)
 }
+
+data class SessionStats(
+    val count: Int,
+    val totalDuration: Long
+)

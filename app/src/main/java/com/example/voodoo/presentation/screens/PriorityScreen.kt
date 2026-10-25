@@ -40,6 +40,7 @@ import com.example.voodoo.presentation.MainViewModel
 import com.example.voodoo.presentation.TaskListViewModel
 import com.example.voodoo.presentation.components.TaskCard
 import com.example.voodoo.presentation.components.TaskSwipeMenu
+import com.example.voodoo.presentation.components.DeleteTaskConfirmation
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -171,6 +172,8 @@ fun PriorityScreen(
             }
         }
     }
+
+    DeleteTaskConfirmation(taskListViewModel)
 
     showSwipeMenu?.let { task ->
         TaskSwipeMenu(

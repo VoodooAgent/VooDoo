@@ -45,6 +45,7 @@ import com.example.voodoo.presentation.components.TaskSwipeMenu
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
+import com.example.voodoo.presentation.components.DeleteTaskConfirmation
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -173,6 +174,8 @@ fun RoutineScreen(
             }
         }
     }
+
+    DeleteTaskConfirmation(taskListViewModel)
 
     showSwipeMenu?.let { task ->
         TaskSwipeMenu(

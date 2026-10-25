@@ -59,6 +59,7 @@ import com.example.voodoo.presentation.components.SwipeConfirmationDialog
 import com.example.voodoo.presentation.components.TaskCard
 import com.example.voodoo.presentation.components.TaskSwipeMenu
 import java.util.Calendar
+import com.example.voodoo.presentation.components.DeleteTaskConfirmation
 
 private fun isColorDark(color: Color): Boolean {
     val luminance = 0.299 * color.red + 0.587 * color.green + 0.114 * color.blue
@@ -403,6 +404,8 @@ fun TaskListScreen(
             }
         )
     }
+
+    DeleteTaskConfirmation(taskListViewModel)
 
     showSwipeMenu?.let { task ->
         TaskSwipeMenu(
