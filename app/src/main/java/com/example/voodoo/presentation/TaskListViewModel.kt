@@ -14,6 +14,7 @@ import com.example.voodoo.util.RebalanceRequiredException
 import com.example.voodoo.util.SortOrderManager
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -35,6 +36,9 @@ class TaskListViewModel(application: Application) : AndroidViewModel(application
 
     private val _pendingCompletionTask = MutableStateFlow<Task?>(null)
     val pendingCompletionTask: StateFlow<Task?> = _pendingCompletionTask.asStateFlow()
+
+    private val _pendingDeletion = MutableStateFlow<PendingDeletion?>(null)
+    val pendingDeletion: StateFlow<PendingDeletion?> = _pendingDeletion.asStateFlow()
 
     val allTasks: StateFlow<List<Task>> = taskDao.getAllTasks()
         .stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
@@ -117,11 +121,15 @@ class TaskListViewModel(application: Application) : AndroidViewModel(application
 
     fun updateTask(task: Task) {
         viewModelScope.launch {
-            taskDao.update(task)
-            if (task.reminderMinutesBefore != null && task.plannedStart != null) {
-                ReminderScheduler.scheduleReminder(getApplication(), task)
-            } else {
-                ReminderScheduler.cancelReminder(getApplication(), task.id)
+            // Экран карточки закрывается сразу после вызова, и ViewModel может быть
+            // очищена до окончания записи: не даём отмене прервать сохранение
+            withContext(NonCancellable) {
+                taskDao.update(task)
+                if (task.reminderMinutesBefore != null && task.plannedStart != null) {
+                    ReminderScheduler.scheduleReminder(getApplication(), task)
+                } else {
+                    ReminderScheduler.cancelReminder(getApplication(), task.id)
+                }
             }
         }
     }
@@ -220,10 +228,30 @@ class TaskListViewModel(application: Application) : AndroidViewModel(application
         }
     }
 
+    /** Собирает, что будет удалено, и показывает подтверждение; удаляет [confirmDelete]. */
     fun deleteTask(task: Task) {
         viewModelScope.launch {
-            taskDao.delete(task)
+            val sessionStats = sessionDao.getSubtreeSessionStats(task.id)
+            _pendingDeletion.value = PendingDeletion(
+                task = task,
+                descendantCount = taskDao.countAllDescendants(task.id),
+                sessionCount = sessionStats.count,
+                trackedMillis = sessionStats.totalDuration,
+                activeTimerCount = taskDao.countActiveTimersInSubtree(task.id)
+            )
         }
+    }
+
+    fun confirmDelete() {
+        val pending = _pendingDeletion.value ?: return
+        _pendingDeletion.value = null
+        viewModelScope.launch {
+            taskDao.delete(pending.task)
+        }
+    }
+
+    fun cancelDelete() {
+        _pendingDeletion.value = null
     }
 
     fun toggleTaskExpanded(taskId: Long) {
@@ -565,3 +593,11 @@ class TaskListViewModel(application: Application) : AndroidViewModel(application
         taskDao.updateRoutineDayOfMonth(taskId, day)
     }
 }
+
+data class PendingDeletion(
+    val task: Task,
+    val descendantCount: Int,
+    val sessionCount: Int,
+    val trackedMillis: Long,
+    val activeTimerCount: Int
+)

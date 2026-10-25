@@ -19,6 +19,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.DeleteForever
+import androidx.compose.material.icons.filled.Restore
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -35,6 +36,7 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -48,6 +50,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import com.example.voodoo.presentation.MainViewModel
+import com.example.voodoo.presentation.PendingImport
+import java.io.File
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -61,6 +65,9 @@ val settings by viewModel.settings.collectAsState()
     val importResult by viewModel.importResult.collectAsState()
     val deleteResult by viewModel.deleteResult.collectAsState()
     var showDeleteAllDialog by remember { mutableStateOf(false) }
+    var showRestoreDialog by remember { mutableStateOf(false) }
+    val pendingImport by viewModel.pendingImport.collectAsState()
+    val autoBackups by viewModel.autoBackups.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
 
     val exportLauncher = rememberLauncherForActivityResult(
@@ -275,6 +282,21 @@ val settings by viewModel.settings.collectAsState()
                 Text("Импорт из CSV")
             }
 
+            OutlinedButton(
+                onClick = {
+                    viewModel.refreshAutoBackups()
+                    showRestoreDialog = true
+                },
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Restore,
+                    contentDescription = null,
+                    modifier = Modifier.padding(end = 8.dp)
+                )
+                Text("Восстановить из автокопии")
+            }
+
             Spacer(modifier = Modifier.height(16.dp))
 
             // Кнопка "Удалить ВСЁ"
@@ -309,6 +331,123 @@ val settings by viewModel.settings.collectAsState()
             }
         )
     }
+
+    if (showRestoreDialog) {
+        RestoreBackupDialog(
+            backups = autoBackups,
+            onSelect = { file ->
+                showRestoreDialog = false
+                viewModel.restoreFromAutoBackup(file)
+            },
+            onDismiss = { showRestoreDialog = false }
+        )
+    }
+
+    pendingImport?.let { pending ->
+        ImportConfirmDialog(
+            pending = pending,
+            onConfirm = { viewModel.confirmImport() },
+            onDismiss = { viewModel.cancelImport() }
+        )
+    }
+}
+
+@Composable
+fun ImportConfirmDialog(
+    pending: PendingImport,
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    val backup = pending.backup
+    val source = pending.sourceName?.let { "Автокопия $it" } ?: "В файле"
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Заменить все данные?") },
+        text = {
+            Text(
+                text = "$source: контекстов ${backup.contexts.size}, задач ${backup.tasks.size}, " +
+                    "сессий ${backup.sessions.size}.\n\n" +
+                    "Все текущие контексты, задачи и сессии будут заменены. " +
+                    "Перед заменой текущие данные сохранятся в автокопию, " +
+                    "её можно вернуть кнопкой «Восстановить из автокопии».",
+                style = MaterialTheme.typography.bodyLarge
+            )
+        },
+        confirmButton = {
+            Button(
+                onClick = onConfirm,
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.error
+                )
+            ) {
+                Text("Заменить", color = Color.White)
+            }
+        },
+        dismissButton = {
+            OutlinedButton(onClick = onDismiss) {
+                Text("Отменить")
+            }
+        },
+        icon = {
+            Icon(
+                imageVector = Icons.Default.Warning,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.error
+            )
+        }
+    )
+}
+
+@Composable
+fun RestoreBackupDialog(
+    backups: List<File>,
+    onSelect: (File) -> Unit,
+    onDismiss: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Автокопии") },
+        text = {
+            if (backups.isEmpty()) {
+                Text(
+                    "Автокопий пока нет. Они создаются перед импортом и перед «Удалить ВСЁ».",
+                    style = MaterialTheme.typography.bodyLarge
+                )
+            } else {
+                Column {
+                    backups.forEach { file ->
+                        TextButton(
+                            onClick = { onSelect(file) },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text(
+                                text = autoBackupLabel(file),
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Закрыть")
+            }
+        }
+    )
+}
+
+// voodoo_auto_2026-10-25_18-30-05_import.csv -> "25.10.2026 18:30 — перед импортом"
+private fun autoBackupLabel(file: File): String {
+    val match = Regex("""voodoo_auto_(\d{4})-(\d{2})-(\d{2})_(\d{2})-(\d{2})-\d{2}_(\w+)\.csv""")
+        .matchEntire(file.name) ?: return file.name
+    val (year, month, day, hour, minute, reason) = match.destructured
+    val reasonText = when (reason) {
+        "import" -> "перед импортом"
+        "delete_all" -> "перед «Удалить ВСЁ»"
+        else -> reason
+    }
+    return "$day.$month.$year $hour:$minute — $reasonText"
 }
 
 @Composable
@@ -327,7 +466,7 @@ fun DeleteAllConfirmDialog(
         },
         text = {
             Text(
-                text = "Вы уверены что хотите удалить все задачи и сессии из базы данных?\n\nЭто действие нельзя отменить!",
+                text = "Вы уверены что хотите удалить все задачи и сессии из базы данных?\n\nПеред удалением данные сохранятся в автокопию, её можно вернуть кнопкой «Восстановить из автокопии».",
                 style = MaterialTheme.typography.bodyLarge
             )
         },

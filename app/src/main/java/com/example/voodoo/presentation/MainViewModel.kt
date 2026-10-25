@@ -7,6 +7,7 @@ import androidx.lifecycle.viewModelScope
 import androidx.room.withTransaction
 import com.example.voodoo.data.AppDatabase
 import com.example.voodoo.data.AppSettings
+import com.example.voodoo.data.CsvBackup
 import com.example.voodoo.data.CsvHelper
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -14,6 +15,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.io.File
 
 class MainViewModel(application: Application) : AndroidViewModel(application) {
 
@@ -35,6 +37,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     private val _deleteResult = MutableStateFlow<String?>(null)
     val deleteResult: StateFlow<String?> = _deleteResult.asStateFlow()
+
+    // Разобранный файл, ожидающий подтверждения замены данных
+    private val _pendingImport = MutableStateFlow<PendingImport?>(null)
+    val pendingImport: StateFlow<PendingImport?> = _pendingImport.asStateFlow()
+
+    private val _autoBackups = MutableStateFlow<List<File>>(emptyList())
+    val autoBackups: StateFlow<List<File>> = _autoBackups.asStateFlow()
 
     init {
         viewModelScope.launch {
@@ -121,16 +130,48 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    /** Читает и проверяет файл; база меняется только после [confirmImport]. */
     fun importData(uri: Uri) {
         viewModelScope.launch {
-            val result = csvHelper.importFromCsv(uri)
+            csvHelper.readCsv(uri)
+                .onSuccess { _pendingImport.value = PendingImport(it, sourceName = null) }
+                .onFailure { _importResult.value = "Импорт отменён: ${it.message}" }
+        }
+    }
+
+    fun restoreFromAutoBackup(file: File) {
+        viewModelScope.launch {
+            csvHelper.readCsv(file)
+                .onSuccess { _pendingImport.value = PendingImport(it, sourceName = file.name) }
+                .onFailure { _importResult.value = "Восстановление отменено: ${it.message}" }
+        }
+    }
+
+    fun confirmImport() {
+        val pending = _pendingImport.value ?: return
+        _pendingImport.value = null
+        viewModelScope.launch {
+            val result = csvHelper.replaceAll(pending.backup)
             _importResult.value = result.getOrNull() ?: "Ошибка: ${result.exceptionOrNull()?.message}"
+            refreshAutoBackups()
+        }
+    }
+
+    fun cancelImport() {
+        _pendingImport.value = null
+    }
+
+    fun refreshAutoBackups() {
+        viewModelScope.launch(Dispatchers.IO) {
+            _autoBackups.value = csvHelper.listAutoBackups()
         }
     }
 
     fun deleteAllData() {
         viewModelScope.launch {
             try {
+                csvHelper.createAutoBackup("delete_all")
+                refreshAutoBackups()
                 withContext(Dispatchers.IO) {
                     database.withTransaction {
                         database.timerSessionDao().deleteAll()
@@ -159,3 +200,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         _deleteResult.value = null
     }
 }
+
+data class PendingImport(
+    val backup: CsvBackup,
+    // null — файл выбран пользователем; иначе имя автоматической копии
+    val sourceName: String?
+)

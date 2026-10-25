@@ -16,8 +16,9 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         ICalSyncSetting::class,
         CalendarContextSetting::class
     ],
-    version = 12,  // Обновлено с 11 до 12
-    exportSchema = false
+    version = AppDatabase.VERSION,
+    // Схема каждой версии сохраняется в app/schemas и коммитится: по ней проверяются миграции
+    exportSchema = true
 )
 abstract class AppDatabase : RoomDatabase() {
     abstract fun contextDao(): ProjectContextDao
@@ -28,6 +29,9 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun calendarContextDao(): CalendarContextDao
 
     companion object {
+        const val VERSION = 12
+        const val DATABASE_NAME = "voodoo_database"
+
         @Volatile
         private var INSTANCE: AppDatabase? = null
 
@@ -260,19 +264,33 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        val ALL_MIGRATIONS: List<Migration> = listOf(
+            MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8,
+            MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12
+        )
+
         fun getDatabase(context: Context): AppDatabase {
             return INSTANCE ?: synchronized(this) {
-                val instance = Room.databaseBuilder(
-                    context.applicationContext,
-                    AppDatabase::class.java,
-                    "voodoo_database"
-                )
-                    .addMigrations(MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12)
-                    .fallbackToDestructiveMigration()
-                    .build()
+                val instance = buildDatabase(context, DATABASE_NAME)
                 INSTANCE = instance
                 instance
             }
         }
+
+        // Для тестов: закрыть общий экземпляр, чтобы следующий тест открыл свою базу
+        internal fun resetInstanceForTests() {
+            synchronized(this) {
+                INSTANCE?.close()
+                INSTANCE = null
+            }
+        }
+
+        // Без fallbackToDestructiveMigration: если для новой версии схемы забыть
+        // миграцию, приложение упадёт при открытии базы, но данные останутся
+        // на месте. Раньше Room в этом случае молча удалял все таблицы.
+        internal fun buildDatabase(context: Context, name: String): AppDatabase =
+            Room.databaseBuilder(context.applicationContext, AppDatabase::class.java, name)
+                .addMigrations(*ALL_MIGRATIONS.toTypedArray())
+                .build()
     }
 }
